@@ -1,0 +1,35 @@
+# macOS
+.DS_Store
+
+# Local application data and backups
+data/
+backups/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.sqlite-shm
+*.sqlite-wal
+*.backup
+*.bak
+*.log
+
+# Credentials and local environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+
+# Generated build artifacts
+build/
+dist/
+DerivedData/
+.build/
+node_modules/
+
+# Per-user editor and Xcode state
+xcuserdata/
+*.xcuserstate
