@@ -35,7 +35,7 @@ import LifeCore
                 let today=Day.key(Date())
                 if today != self.lastDay { if self.model.day == self.lastDay { self.model.selectedDate=Date() };self.lastDay=today;self.model.ensureTrainings() }
                 self.model.notifications.checkProbe()
-                self.model.notifications.sync(self.model.library)
+                if !self.model.locked { self.model.notifications.sync(self.model.library) }
                 self.model.objectWillChange.send()
             }
         }

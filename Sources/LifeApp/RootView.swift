@@ -36,8 +36,8 @@ struct RootView: View {
         } else if model.page == "游戏娱乐" { GamesView(model: model)
         } else if model.page == "开发工作" { ProjectsView(model: model)
         } else if model.page == "笔记" { NotesView(model: model)
-        } else if model.page == "首页总览" { MemosView(model: model)
-        } else { ContentUnavailableView("尚无记录", systemImage: "tray", description: Text("应用基础已就绪，业务模块正在开发。")) }
+        } else if model.page == "首页总览" { HomeView(model: model)
+        } else { ContentUnavailableView("尚无记录", systemImage: "tray", description: Text("请选择左侧模块")) }
     }
 }
 struct DayPicker: View {

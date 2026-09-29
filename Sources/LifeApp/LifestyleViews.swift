@@ -95,7 +95,7 @@ struct ProjectsView:View {
                     }
                 } else { ContentUnavailableView("选择一个项目",systemImage:"folder",description:Text("记录任务、问题和开发进展")) }
             }
-        }.sheet(item:$editProject) { p in ProjectEditor(model:model,original:p) }
+        }.onAppear { if let id=model.selectedProjectID { selected=id;showArchived=model.library.projects.first { $0.id == id }?.archived ?? false } }.sheet(item:$editProject) { p in ProjectEditor(model:model,original:p) }
     }
 }
 struct ProjectEditor:View {

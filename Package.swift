@@ -7,7 +7,8 @@ let package = Package(
     targets: [
         .target(name: "LifeCore"),
         .executableTarget(name: "LifeApp", dependencies: ["LifeCore"]),
-        .testTarget(name: "LifeCoreTests", dependencies: ["LifeCore"])
+        .testTarget(name: "LifeCoreTests", dependencies: ["LifeCore"]),
+        .testTarget(name: "LifeAppTests", dependencies: ["LifeApp", "LifeCore"])
     ],
     swiftLanguageModes: [.v5]
 )
