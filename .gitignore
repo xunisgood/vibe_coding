@@ -33,3 +33,9 @@ node_modules/
 # Per-user editor and Xcode state
 xcuserdata/
 *.xcuserstate
+
+# Backup bundles and local test evidence
+*.lifebackup
+*.original
+library.lock
+docs/evidence/
