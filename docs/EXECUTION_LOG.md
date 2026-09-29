@@ -5,3 +5,6 @@
 
 ## P1
 原生方案 SwiftUI/AppKit + Foundation + UserNotifications；无第三方依赖。修复默认 CLT 的 ManifestAPI 不一致后，用完整 Xcode 26.3 构建。EnvironmentTests 2 项通过；release 构建、ad-hoc 签名核验通过；实际系统通知已登记并由系统已交付列表核实。拒绝权限路径也已观察到明确错误。交互说明、技术设计、通知报告和原草图均入库。真实休眠/重启在 P9 保持待验收，不声称已通过。
+
+## P2
+8 项测试通过（原有 2 项 + StorageTests 6 项），release 构建和签名通过。覆盖独立实例重新读取、模拟中断保持旧文件、损坏文件保留、未来版本及无效数据拒绝、不可写路径和重复／孤立关联。修复 AppKit 启动入口 MainActor 隔离错误，未删除测试。
