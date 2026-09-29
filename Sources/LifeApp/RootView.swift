@@ -31,6 +31,7 @@ struct RootView: View {
         if model.page == "设置与数据" {
             SettingsView(model: model)
         } else if model.page == "今日计划" { TodosView(model: model)
+        } else if model.page == "健身计划" { TrainingsView(model: model)
         } else if model.page == "笔记" { NotesView(model: model)
         } else if model.page == "首页总览" { MemosView(model: model)
         } else { ContentUnavailableView("尚无记录", systemImage: "tray", description: Text("应用基础已就绪，业务模块正在开发。")) }

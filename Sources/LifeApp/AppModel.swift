@@ -37,6 +37,11 @@ import LifeCore
         if change(action) { undoAction = undo; undoAvailable = true }
     }
     func undo() { guard let action = undoAction else { return }; if change(action) { undoAction = nil; undoAvailable = false } }
+    func ensureTrainings() {
+        guard !locked else { return }
+        var next=library; next.materialize(from:day,through:Day.adding(45,to:day))
+        if next != library { change { $0=next } }
+    }
     var backups: BackupService { BackupService(store: store) }
     func backupAutomatically() {
         do { try backups.automatic(library); backupStatus = backups.latest(library).map { "最近备份：" + $0.formatted() } ?? "尚无备份" }

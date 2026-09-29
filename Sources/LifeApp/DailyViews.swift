@@ -16,6 +16,7 @@ struct TodosView: View {
                 if items.isEmpty { Text("这一天暂无待办，添加一件想做的事。").foregroundStyle(.secondary) }
                 ForEach(items) { row($0) }
             }
+            TrainingLinks(model: model, day: model.day)
             if model.library.todos.contains(where: { $0.day == model.day && $0.done }) {
                 DisclosureGroup("已完成") {
                     ForEach(model.library.todos.filter { $0.day == model.day && $0.done }) { row($0) }
@@ -36,7 +37,7 @@ struct TodosView: View {
                     }
                 }
             }
-        }.sheet(item: $editing) { todo in TodoEditor(model: model, original: todo) }
+        }.onAppear { model.ensureTrainings() }.onChange(of: model.day) { _, _ in model.ensureTrainings() }.sheet(item: $editing) { todo in TodoEditor(model: model, original: todo) }
     }
     func add() { let clean = title.trimmingCharacters(in: .whitespacesAndNewlines); guard !clean.isEmpty else { return }; if model.change({ $0.todos.append(Todo(title: clean, day: model.day)) }) { title = "" } }
     func row(_ t: Todo) -> some View {
