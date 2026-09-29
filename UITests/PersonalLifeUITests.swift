@@ -10,8 +10,8 @@ final class PersonalLifeUITests: XCTestCase {
     app = XCUIApplication(bundleIdentifier: "com.xunisgood.personallife.uitestapp")
     dataDirectory = NSTemporaryDirectory() + "PersonalLife-UI-" + UUID().uuidString
     app.launchArguments = ["--data-directory", dataDirectory]
-    app.launch()
     originalInputSource = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
+    app.launch()
     XCTAssertEqual(
       TISSelectInputSource(TISCopyCurrentASCIICapableKeyboardInputSource().takeRetainedValue()),
       noErr)
@@ -45,12 +45,10 @@ final class PersonalLifeUITests: XCTestCase {
     XCTAssertTrue(app.staticTexts["本地数据"].exists)
   }
   func expandCompleted() {
-    let disclosure = app.disclosureTriangles["已完成"]
-    XCTAssertTrue(disclosure.waitForExistence(timeout: 5))
-    if (disclosure.value as? NSNumber)?.intValue == 0 {
-      disclosure.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.5)).click()
-    }
-    XCTAssertEqual((disclosure.value as? NSNumber)?.intValue, 1, app.debugDescription)
+    let toggle = app.buttons["completed-toggle"]
+    XCTAssertTrue(toggle.waitForExistence(timeout: 5))
+    if (toggle.value as? String) == "收起" { toggle.click() }
+    XCTAssertEqual(toggle.value as? String, "展开", app.debugDescription)
   }
   func testTodoCompletionUndoAndRelaunch() {
     click("nav-1")
@@ -216,7 +214,11 @@ final class PersonalLifeUITests: XCTestCase {
     app.typeKey("g", modifierFlags: [.command, .shift])
     let path = app.sheets.textFields.firstMatch
     XCTAssertTrue(path.waitForExistence(timeout: 5), app.debugDescription)
-    path.typeText(dataDirectory + "/Backups/" + backup)
+    path.click()
+    path.typeKey("a", modifierFlags: [.command])
+    let backupPath = dataDirectory + "/Backups/" + backup
+    path.typeText(backupPath)
+    XCTAssertEqual(path.value as? String, backupPath)
     path.typeKey(.return, modifierFlags: [])
     click("打开")
     click("确认")
@@ -248,5 +250,37 @@ final class PersonalLifeUITests: XCTestCase {
     XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 5))
     XCTAssertTrue(app.staticTexts[title].exists)
     screenshot("dock-reopened")
+  }
+  func testSidebarAlignmentAndDarkAppearance() {
+    let first = app.buttons["nav-0"].frame
+    for i in 0...7 {
+      let row = app.buttons["nav-\(i)"]
+      XCTAssertEqual(row.frame.minX, first.minX, accuracy: 1)
+      XCTAssertEqual(row.frame.width, first.width, accuracy: 1)
+      XCTAssertTrue(row.isHittable)
+    }
+    app.terminate()
+    app.launchArguments += ["--ui-appearance", "dark"]
+    app.launch()
+    XCTAssertTrue(
+      app.descendants(matching: .any).matching(identifier: "life-root-dark").firstMatch
+        .waitForExistence(timeout: 5), app.debugDescription)
+    for i in [0, 2, 3, 4, 5, 6, 7] {
+      click("nav-\(i)")
+      screenshot("dark-page-\(i)")
+    }
+  }
+  func testCompactLayoutAcrossEveryModule() {
+    let window = app.windows.firstMatch
+    let corner = window.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
+      .withOffset(CGVector(dx: -2, dy: -2))
+    corner.click(forDuration: 0.2, thenDragTo: corner.withOffset(CGVector(dx: -220, dy: -140)))
+    for i in 0...7 {
+      click("nav-\(i)")
+      XCTAssertLessThanOrEqual(window.frame.width, 900)
+      XCTAssertTrue(app.buttons["nav-7"].isHittable)
+      screenshot("compact-page-\(i)")
+    }
+    XCTAssertTrue(app.staticTexts["本地数据"].exists)
   }
 }

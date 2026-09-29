@@ -6,15 +6,16 @@ struct MealsView: View {
   var body: some View {
     DayPicker(model: model)
     let n = model.library.nutrition(on: model.day)
-    Panel(title: n.partial ? "已填写部分合计" : "当天实际合计") {
-      HStack {
-        Text("\(n.calories.formatted()) kcal").font(.title)
-        Text("蛋白质 \(n.protein.formatted()) g").font(.title3)
-        Spacer()
-        Text("已记录 \(n.recordedMeals) 餐").foregroundStyle(.secondary)
-      }
-      Text("仅合计实际饮食中手动填写的营养值，空白代表未记录。").font(.caption).foregroundStyle(.secondary)
+    HStack(spacing: 16) {
+      MetricTile(
+        label: n.partial ? "已填写部分合计" : "当天实际合计", value: "\(n.calories.formatted()) kcal",
+        detail: "仅统计实际饮食的已填热量", symbol: "flame", color: .orange)
+      MetricTile(
+        label: "蛋白质", value: "\(n.protein.formatted()) g", detail: "已记录 \(n.recordedMeals) 餐",
+        symbol: "leaf", color: .green)
     }
+    Text("仅合计实际饮食中手动填写的营养值，空白代表未记录。")
+      .font(.caption).foregroundStyle(.secondary)
     ForEach(["早餐", "午餐", "晚餐", "加餐"], id: \.self) { slot in
       MealEditor(model: model, day: model.day, slot: slot).id(model.day + slot)
     }
@@ -29,6 +30,15 @@ struct MealEditor: View {
   }
   var body: some View {
     Panel(title: slot) {
+      HStack(spacing: 8) {
+        Image(
+          systemName: slot == "早餐"
+            ? "sunrise" : slot == "午餐" ? "sun.max" : slot == "晚餐" ? "moon" : "cup.and.saucer"
+        )
+        .foregroundStyle(.green)
+        Text(slot == "加餐" ? "一点补充，适量就好" : "计划与实际，各自记录")
+          .font(.caption).foregroundStyle(.secondary)
+      }
       HStack(alignment: .top, spacing: 20) {
         VStack(alignment: .leading) {
           Text("计划吃什么").font(.caption)
@@ -82,20 +92,25 @@ struct GamesView: View {
     VStack(alignment: .leading, spacing: 18) {
       DayPicker(model: model)
       HStack {
-        Text("今日游戏：\(model.library.gameMinutes(on:model.day)) 分钟").font(.title2)
+        VStack(alignment: .leading, spacing: 5) {
+          Text("今日游戏：\(model.library.gameMinutes(on:model.day)) 分钟")
+            .font(.system(size: 23, weight: .semibold, design: .rounded)).monospacedDigit()
+          Text("快乐也值得被记录").font(.caption).foregroundStyle(.secondary)
+        }
         Spacer()
         Button("记录游戏") { edit = Game(day: model.day, name: "", minutes: 30) }.buttonStyle(
           .borderedProminent)
       }
       let games = model.library.games.filter { $0.day == model.day }
       if games.isEmpty {
-        ContentUnavailableView(
+        LifeEmptyState(
           "还没有游戏记录", systemImage: "gamecontroller", description: Text("玩过之后，记下名称和时长即可"))
       }
       ForEach(games) { g in
         Panel(title: g.name) {
           HStack {
-            Text("\(g.minutes/60) 小时 \(g.minutes%60) 分钟")
+            Label("\(g.minutes/60) 小时 \(g.minutes%60) 分钟", systemImage: "clock")
+              .font(.system(size: 19, weight: .medium, design: .rounded)).foregroundStyle(.pink)
             Spacer()
             Button("编辑") { edit = g }
             Button("删除") {
@@ -163,7 +178,7 @@ struct GameEditor: View {
         }.buttonStyle(.borderedProminent).disabled(
           value.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
       }
-    }.padding(24).frame(width: 460)
+    }.padding(28).frame(width: 460).background(LifeBackdrop())
   }
 }
 struct ProjectsView: View {
@@ -197,14 +212,14 @@ struct ProjectsView: View {
                 Text(p.updated.formatted(date: .abbreviated, time: .omitted)).font(.caption2)
               }.padding(10).frame(maxWidth: .infinity, alignment: .leading).background(
                 selected == p.id ? Color.accentColor.opacity(0.12) : .clear
-              ).cornerRadius(8)
+              ).cornerRadius(14)
             }.buttonStyle(.plain)
           }
           if !model.library.projects.contains(where: { $0.archived == showArchived }) {
             Text("暂无项目").foregroundStyle(.secondary)
           }
-        }.frame(width: 200)
-        Divider()
+        }.padding(14).frame(width: 214).lifeCard()
+        Divider().overlay(.primary.opacity(0.04))
         if let id = selected, let p = model.library.projects.first(where: { $0.id == id }) {
           VStack(alignment: .leading, spacing: 16) {
             HStack {
@@ -229,7 +244,7 @@ struct ProjectsView: View {
             ProjectEntriesView(model: model, projectID: id).id(id)
           }
         } else {
-          ContentUnavailableView("选择一个项目", systemImage: "folder", description: Text("记录任务、问题和开发进展"))
+          LifeEmptyState("选择一个项目", systemImage: "folder", description: Text("记录任务、问题和开发进展"))
         }
       }
     }.onAppear {
@@ -270,7 +285,7 @@ struct ProjectEditor: View {
         }.buttonStyle(.borderedProminent).disabled(
           value.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
       }
-    }.padding(24).frame(width: 450)
+    }.padding(28).frame(width: 450).background(LifeBackdrop())
   }
 }
 struct ProjectEntriesView: View {
@@ -347,7 +362,8 @@ struct EntryEditor: View {
         }
       }
       Text("内容 / 问题 / 下一步").font(.caption)
-      TextEditor(text: $value.body).frame(height: 190)
+      TextEditor(text: $value.body).scrollContentBackground(.hidden).frame(height: 190).padding(12)
+        .lifeCard(radius: 12)
       HStack {
         Button("取消") { dismiss() }
         Spacer()
@@ -357,6 +373,6 @@ struct EntryEditor: View {
         }.buttonStyle(.borderedProminent).disabled(
           value.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
       }
-    }.padding(24).frame(width: 500)
+    }.padding(28).frame(width: 500).background(LifeBackdrop())
   }
 }

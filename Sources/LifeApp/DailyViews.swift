@@ -5,6 +5,7 @@ struct TodosView: View {
   @ObservedObject var model: AppModel
   @State private var title = ""
   @State private var editing: Todo?
+  @State private var completedExpanded = false
   var body: some View {
     VStack(alignment: .leading, spacing: 18) {
       DayPicker(model: model)
@@ -20,9 +21,24 @@ struct TodosView: View {
       }
       TrainingLinks(model: model, day: model.day)
       if model.library.todos.contains(where: { $0.day == model.day && $0.done }) {
-        DisclosureGroup("已完成") {
-          ForEach(model.library.todos.filter { $0.day == model.day && $0.done }) { row($0) }
-        }
+        VStack(alignment: .leading, spacing: 12) {
+          Button {
+            completedExpanded.toggle()
+          } label: {
+            HStack {
+              Image(systemName: completedExpanded ? "chevron.down" : "chevron.right").frame(
+                width: 14)
+              Text("已完成").font(.system(size: 13, weight: .semibold))
+              Spacer()
+              Text("\(model.library.todos.filter { $0.day == model.day && $0.done }.count)")
+                .font(.caption).foregroundStyle(.secondary)
+            }.padding(12).contentShape(Rectangle())
+          }.buttonStyle(.plain).accessibilityIdentifier("completed-toggle")
+            .accessibilityValue(completedExpanded ? "展开" : "收起")
+          if completedExpanded {
+            ForEach(model.library.todos.filter { $0.day == model.day && $0.done }) { row($0) }
+          }
+        }.padding(8).lifeCard(radius: 16)
       }
       if model.day == model.today {
         let earlier = model.library.todos.filter { $0.day < model.today && !$0.done }
@@ -106,7 +122,9 @@ struct TodoEditor: View {
       TextField("名称（必填）", text: $value.title)
       DatePicker("所属日期", selection: $date, displayedComponents: .date)
       Text("说明")
-      TextEditor(text: $value.detail).frame(height: 120).border(.quaternary)
+      TextEditor(text: $value.detail).scrollContentBackground(.hidden).frame(height: 120).padding(
+        12
+      ).lifeCard(radius: 12)
       Toggle("提醒我", isOn: $hasReminder)
       Text("通过 Mac 系统通知提醒，首次启用会请求授权。").font(.caption).foregroundStyle(.secondary)
       if hasReminder {
@@ -131,7 +149,7 @@ struct TodoEditor: View {
         }.buttonStyle(.borderedProminent).disabled(
           value.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
       }
-    }.padding(24).frame(width: 500)
+    }.padding(28).frame(width: 500).background(LifeBackdrop())
   }
 }
 struct NotesView: View {
@@ -156,21 +174,22 @@ struct NotesView: View {
               Text(n.title.isEmpty ? "无标题" : n.title).font(.headline)
               Text(n.updated.formatted()).font(.caption).foregroundStyle(.secondary)
             }.frame(maxWidth: .infinity, alignment: .leading).padding(10).background(
-              selection == n.id ? Color.accentColor.opacity(0.1) : .clear
-            ).cornerRadius(8)
+              selection == n.id ? Color.accentColor.opacity(0.10) : .clear
+            ).cornerRadius(14)
           }.buttonStyle(.plain)
         }
         if model.library.matchingNotes(query).isEmpty {
           Text(query.isEmpty ? "暂无笔记" : "没有匹配的笔记").foregroundStyle(.secondary)
         }
-      }.frame(width: 245)
-      Divider()
+      }.padding(14).frame(width: 235).lifeCard()
+      Divider().overlay(.primary.opacity(0.04))
       if let id = selection, let n = model.library.notes.first(where: { $0.id == id }) {
         VStack(alignment: .leading, spacing: 12) {
-          TextField("标题", text: noteBinding(id, \.title)).font(.title2)
-          TextEditor(text: noteBinding(id, \.body)).frame(minHeight: 350).padding(8).background(
-            .background
-          ).cornerRadius(8)
+          TextField("标题", text: noteBinding(id, \.title)).font(.system(size: 22, weight: .semibold))
+          TextEditor(text: noteBinding(id, \.body)).font(.system(size: 14)).scrollContentBackground(
+            .hidden
+          )
+          .frame(minHeight: 350).padding(18).lifeCard()
           HStack {
             Text("自动保存").font(.caption).foregroundStyle(.secondary)
             Spacer()
@@ -181,7 +200,7 @@ struct NotesView: View {
           }
         }
       } else {
-        ContentUnavailableView("记录一个想法", systemImage: "note.text", description: Text("新建笔记或选择已有笔记"))
+        LifeEmptyState("记录一个想法", systemImage: "note.text", description: Text("新建笔记或选择已有笔记"))
       }
     }.onAppear { if selection == nil { selection = model.library.notes.first?.id } }
   }

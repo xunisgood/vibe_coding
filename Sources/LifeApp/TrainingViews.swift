@@ -21,7 +21,7 @@ struct TrainingsView: View {
         TrainingRecordView(model: model, id: t.id).id("life.training." + t.id)
       }
       if !model.library.trainings.contains(where: { $0.day == model.day }) {
-        ContentUnavailableView(
+        LifeEmptyState(
           "这一天没有训练安排", systemImage: "dumbbell", description: Text("可添加一次性或每周重复的训练"))
       }
       Panel(title: "训练安排") {
@@ -143,7 +143,7 @@ struct PlanEditor: View {
               $0.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             })
       }
-    }.padding(24).frame(width: 580)
+    }.padding(28).frame(width: 580).background(LifeBackdrop())
   }
 }
 struct ExercisePlanEditor: View {
@@ -181,7 +181,11 @@ struct TrainingRecordView: View {
     if let t = training {
       Panel(title: t.name) {
         HStack {
-          Text(t.status).foregroundStyle(.secondary)
+          Text(t.status).font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(t.status == "已完成" ? Color.green : Color.orange)
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(
+              (t.status == "已完成" ? Color.green : Color.orange).opacity(0.09), in: Capsule())
           if let r = t.reminder {
             Text("提醒 " + r.formatted(date: .omitted, time: .shortened)).font(.caption)
           }
@@ -190,7 +194,8 @@ struct TrainingRecordView: View {
         }
         ForEach(t.exercises) { e in
           VStack(alignment: .leading, spacing: 8) {
-            Text(e.name).font(.headline)
+            Label(e.name, systemImage: e.kind == "力量" ? "dumbbell" : "figure.run")
+              .font(.system(size: 15, weight: .semibold))
             if e.kind == "力量" {
               Text("计划 \(e.plannedSets) 组 × \(e.plannedReps) 次 · \(e.plannedWeight.formatted()) kg")
                 .font(.caption).foregroundStyle(.secondary)
@@ -237,7 +242,8 @@ struct TrainingRecordView: View {
                   }), format: .number
               ).frame(width: 150)
             }
-          }.padding(.vertical, 8)
+          }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
+            .background(.primary.opacity(0.025), in: RoundedRectangle(cornerRadius: 14))
         }
         HStack {
           Button("完成训练") { model.change { try $0.setTrainingStatus(id, "已完成") } }.buttonStyle(
@@ -311,7 +317,7 @@ struct SingleTrainingEditor: View {
           if model.change({ try $0.updateTraining(value) }) { dismiss() }
         }.buttonStyle(.borderedProminent)
       }
-    }.padding(24).frame(width: 580)
+    }.padding(28).frame(width: 580).background(LifeBackdrop())
   }
 }
 struct TrainingLinks: View {

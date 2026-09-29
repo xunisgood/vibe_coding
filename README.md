@@ -105,6 +105,7 @@ bash scripts/test-reboot.sh verify
 
 ## 文档
 
+- [视觉重构与兼容说明](docs/VISUAL_REDESIGN.md)
 - [PRD](PRD.md)
 - [开发计划](DEVELOPMENT_PLAN.md)
 - [技术设计](docs/TECHNICAL_DESIGN.md)

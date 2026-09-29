@@ -10,6 +10,12 @@ import UserNotifications
   var timer: Timer?
   func applicationDidFinishLaunching(_ notification: Notification) {
     let args = CommandLine.arguments
+    // UI-test-only appearance override; never writes the user's system appearance preference.
+    if Bundle.main.bundleIdentifier == "com.xunisgood.personallife.uitestapp",
+      let index = args.firstIndex(of: "--ui-appearance"), args.count > index + 1
+    {
+      NSApp.appearance = NSAppearance(named: args[index + 1] == "dark" ? .darkAqua : .aqua)
+    }
     if let index = args.firstIndex(of: "--native-check"), args.count > index + 2 {
       Task {
         await NativeChecks.run(args[index + 1], output: URL(fileURLWithPath: args[index + 2]))
@@ -30,6 +36,9 @@ import UserNotifications
       styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false
     )
     window.title = "我的日常"
+    window.titlebarAppearsTransparent = true
+    window.titlebarSeparatorStyle = .none
+    window.backgroundColor = .windowBackgroundColor
     window.isReleasedWhenClosed = false
     window.minSize = NSSize(width: 880, height: 620)
     window.contentView = NSHostingView(rootView: RootView(model: model))

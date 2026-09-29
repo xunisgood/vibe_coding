@@ -9,43 +9,66 @@ let symbols = [
 ]
 struct RootView: View {
   @ObservedObject var model: AppModel
+  @Environment(\.colorScheme) private var colorScheme
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   var body: some View {
     HStack(spacing: 0) {
-      VStack(alignment: .leading, spacing: 8) {
-        Text("我的日常").font(.title2.bold()).padding(.vertical, 20)
+      VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 11) {
+          Image(systemName: "sparkle").font(.system(size: 24, weight: .light)).foregroundStyle(
+            .indigo
+          )
+          .frame(width: 42, height: 42).background(
+            .indigo.opacity(0.1), in: RoundedRectangle(cornerRadius: 14))
+          VStack(alignment: .leading, spacing: 4) {
+            Text("我的日常").font(.system(size: 17, weight: .semibold))
+            Text("个人生活中心").font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
+          }
+        }.padding(.horizontal, 12).padding(.top, 8).padding(.bottom, 10)
         ForEach(Array(pages.enumerated()), id: \.offset) { i, page in
-          if i == 7 { Spacer() }
-          Button {
+          if i == 6 { Divider().padding(.horizontal, 14).padding(.vertical, 8) }
+          if i == 7 { Spacer(minLength: 8) }
+          NavigationItem(index: i, selected: model.page == page) {
             model.focusedReminderID = nil
             model.page = page
-          } label: {
-            Label(page, systemImage: symbols[i]).frame(maxWidth: .infinity, alignment: .leading)
-              .padding(10)
-              .background(model.page == page ? Color.accentColor.opacity(0.13) : .clear).clipShape(
-                RoundedRectangle(cornerRadius: 8))
-          }.buttonStyle(.plain).accessibilityIdentifier("nav-\(i)")
+          }
         }
-        Text("只在本机 · 无需联网").font(.caption).foregroundStyle(.secondary).padding(.top, 12)
-      }.padding(16).frame(width: 190).background(.quaternary.opacity(0.35))
-      Divider()
+        HStack(spacing: 6) {
+          Image(systemName: "internaldrive").font(.system(size: 10))
+          Text("本地保存 · 私人空间").font(.system(size: 10))
+        }.foregroundStyle(.secondary).padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 6)
+      }.padding(10).frame(width: 200).lifeGlass(radius: 24).padding(12)
       VStack(alignment: .leading, spacing: 0) {
-        HStack {
-          Text(model.page).font(.largeTitle.bold())
-          Spacer()
-          Text(model.status).foregroundStyle(model.dirty || model.locked ? .red : .secondary).font(
-            .caption)
+        HStack(alignment: .top) {
+          VStack(alignment: .leading, spacing: 8) {
+            Text(model.page).font(.system(size: 28, weight: .bold))
+              .accessibilityIdentifier(colorScheme == .dark ? "life-root-dark" : "life-root-light")
+            Text(LifeStyle.subtitles[pages.firstIndex(of: model.page) ?? 0])
+              .font(.system(size: 12)).foregroundStyle(.secondary)
+          }
+          Spacer(minLength: 12)
+          HStack(spacing: 6) {
+            Image(
+              systemName: model.dirty || model.locked
+                ? "exclamationmark.circle" : "checkmark.circle")
+            Text(model.status)
+          }.foregroundStyle(model.dirty || model.locked ? Color.red : Color.secondary)
+            .font(.system(size: 10, weight: .medium)).padding(.horizontal, 10).padding(.vertical, 7)
+            .background(.primary.opacity(0.035), in: Capsule())
           if model.dirty { Button("重试保存") { model.save() } }
-        }.padding(24)
+        }.padding(.horizontal, 28).padding(.top, 30).padding(.bottom, 24)
         ScrollViewReader { proxy in
           ScrollView {
-            VStack(alignment: .leading, spacing: 18) { content }
-              .padding(.horizontal, 24).padding(.bottom, 24)
+            VStack(alignment: .leading, spacing: 20) { content }
+              .padding(.horizontal, 28).padding(.bottom, 28)
               .frame(maxWidth: .infinity, alignment: .leading)
           }.onChange(of: model.focusedReminderID) { _, id in
             guard let id else { return }
             Task { @MainActor in
               await Task.yield()
-              withAnimation { proxy.scrollTo(id, anchor: .top) }
+              withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                proxy.scrollTo(id, anchor: .top)
+              }
             }
           }
         }
@@ -54,10 +77,15 @@ struct RootView: View {
             Text("记录已删除")
             Button("撤销") { model.undo() }
             Spacer()
-          }.padding(10).background(.quaternary)
+          }.padding(14).lifeGlass(radius: 16).padding(.horizontal, 28).padding(.bottom, 12)
         }
       }
     }.frame(minWidth: 880, minHeight: 620)
+      .background(LifeBackdrop())
+
+      .tint(LifeStyle.accent(model.page))
+      .controlSize(.large)
+      .textFieldStyle(.roundedBorder)
       .alert(
         "需要处理",
         isPresented: Binding(get: { model.error != nil }, set: { if !$0 { model.error = nil } })
@@ -93,20 +121,22 @@ struct DayPicker: View {
   @ObservedObject var model: AppModel
   var body: some View {
     HStack {
-      Button {
-        model.selectedDate = Calendar.current.date(
-          byAdding: .day, value: -1, to: model.selectedDate)!
-      } label: {
-        Image(systemName: "chevron.left")
-      }.help("前一天")
-      DatePicker("日期", selection: $model.selectedDate, displayedComponents: .date).labelsHidden()
-      Button {
-        model.selectedDate = Calendar.current.date(
-          byAdding: .day, value: 1, to: model.selectedDate)!
-      } label: {
-        Image(systemName: "chevron.right")
-      }.help("后一天")
-      Button("今天") { model.selectedDate = Date() }
+      HStack(spacing: 8) {
+        Button {
+          model.selectedDate = Calendar.current.date(
+            byAdding: .day, value: -1, to: model.selectedDate)!
+        } label: {
+          Image(systemName: "chevron.left")
+        }.help("前一天")
+        DatePicker("日期", selection: $model.selectedDate, displayedComponents: .date).labelsHidden()
+        Button {
+          model.selectedDate = Calendar.current.date(
+            byAdding: .day, value: 1, to: model.selectedDate)!
+        } label: {
+          Image(systemName: "chevron.right")
+        }.help("后一天")
+        Button("今天") { model.selectedDate = Date() }
+      }.padding(7).lifeGlass(radius: 14)
       Spacer()
     }
   }
@@ -115,11 +145,9 @@ struct Panel<Content: View>: View {
   let title: String
   @ViewBuilder var content: Content
   var body: some View {
-    GroupBox {
-      VStack(alignment: .leading, spacing: 12) { content }.padding(12).frame(
-        maxWidth: .infinity, alignment: .leading)
-    } label: {
-      Text(title).font(.headline)
-    }
+    VStack(alignment: .leading, spacing: 18) {
+      Text(title).font(.system(size: 14, weight: .semibold)).foregroundStyle(.primary)
+      VStack(alignment: .leading, spacing: 12) { content }
+    }.padding(22).frame(maxWidth: .infinity, alignment: .leading).lifeCard()
   }
 }
