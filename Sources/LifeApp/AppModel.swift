@@ -5,6 +5,7 @@ import LifeCore
 
 @MainActor final class AppModel: ObservableObject {
     @Published var library = Library()
+    @Published var focusedReminderID: String?
     @Published var page = "首页总览"
     @Published var selectedDate = Date()
     @Published var status = "已保存"
@@ -15,6 +16,7 @@ import LifeCore
     @Published var undoAvailable = false
     var undoAction: ((inout Library) -> Void)?
     let store: LibraryStore
+    let notifications = Notifications()
     var didSave: (() -> Void)?
     var today: String { Day.key(Date()) }
     var day: String { Day.key(selectedDate) }

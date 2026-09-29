@@ -16,3 +16,5 @@
 真实重启需用户安排；不得自动重启电脑打断工作。
 
 2026-09-29 P1 实验：初次读取权限返回 UNErrorDomain Code=1，系统设置显示通知关闭；开启本应用通知后登记成功，10 秒触发，由 getDeliveredNotifications 确认 identifier=probe 已交付。应用窗口与关闭后重开可正常使用。完整生命周期、点击路由和重启验证仍在 P7/P9 执行，未提前标记通过。
+
+P7：2026-09-29，31 项累计逻辑测试通过。打包应用 --native-check schedule 实际验证权限已授权、同 ID 替换只保留新内容、取消后无待交付记录；进程退出后等待触发，再启动 --native-check inspect，由系统 deliveredNotifications 查到 verify.delivery，退出后交付通过。可用 scripts/test-notifications.sh 重复验证。通知点击路由、真实休眠与重启尚待最终验收。

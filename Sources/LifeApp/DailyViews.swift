@@ -37,7 +37,7 @@ struct TodosView: View {
                     }
                 }
             }
-        }.onAppear { model.ensureTrainings() }.onChange(of: model.day) { _, _ in model.ensureTrainings() }.sheet(item: $editing) { todo in TodoEditor(model: model, original: todo) }
+        }.onChange(of: model.focusedReminderID) { _, value in if let value, let t=model.library.todos.first(where:{ "life.todo."+$0.id.uuidString == value }) { editing=t } }.onAppear { model.ensureTrainings(); if let value=model.focusedReminderID { editing=model.library.todos.first { "life.todo."+$0.id.uuidString == value } } }.onChange(of: model.day) { _, _ in model.ensureTrainings() }.sheet(item: $editing) { todo in TodoEditor(model: model, original: todo) }
     }
     func add() { let clean = title.trimmingCharacters(in: .whitespacesAndNewlines); guard !clean.isEmpty else { return }; if model.change({ $0.todos.append(Todo(title: clean, day: model.day)) }) { title = "" } }
     func row(_ t: Todo) -> some View {

@@ -5,7 +5,12 @@ import LifeCore
 
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate {
     var window: NSWindow!; var model: AppModel!
+    var lastDay=Day.key(Date());var timer:Timer?
     func applicationDidFinishLaunching(_ notification: Notification) {
+        let args=CommandLine.arguments
+        if let index=args.firstIndex(of:"--native-check"),args.count > index+2 {
+            Task { await NativeChecks.run(args[index+1],output:URL(fileURLWithPath:args[index+2])) };return
+        }
         model = AppModel()
         window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1100, height: 760), styleMask: [.titled,.closable,.resizable,.miniaturizable], backing: .buffered, defer: false)
         window.title = "我的日常"; window.isReleasedWhenClosed = false; window.minSize = NSSize(width: 880, height: 620)
@@ -14,11 +19,31 @@ import LifeCore
         let edit = NSMenuItem(); edit.title = "编辑"; edit.submenu = NSMenu(title: "编辑")
         for (name, action, key) in [("剪切", "cut:", "x"),("复制", "copy:", "c"),("粘贴", "paste:", "v"),("全选", "selectAll:", "a")] { edit.submenu?.addItem(withTitle: name, action: Selector(action), keyEquivalent: key) }; menu.addItem(edit); NSApp.mainMenu = menu
         NSApp.activate(ignoringOtherApps: true)
+        model.notifications.model=model
+        model.notifications.openWindow={ [weak self] in self?.window.makeKeyAndOrderFront(nil);NSApp.activate(ignoringOtherApps:true) }
+        model.didSave={ [weak self] in guard let self else { return };self.model.notifications.sync(self.model.library) }
+        if !model.locked {
+            var next=model.library
+            let start=next.plans.map(\.start).min() ?? model.today
+            next.materialize(from:start,through:Day.adding(45,to:model.today))
+            if next != model.library { model.change { $0=next } }
+            model.notifications.sync(model.library)
+        }
+        timer=Timer.scheduledTimer(withTimeInterval:15,repeats:true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                let today=Day.key(Date())
+                if today != self.lastDay { if self.model.day == self.lastDay { self.model.selectedDate=Date() };self.lastDay=today;self.model.ensureTrainings() }
+                self.model.notifications.checkProbe()
+                self.model.notifications.sync(self.model.library)
+                self.model.objectWillChange.send()
+            }
+        }
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { window.makeKeyAndOrderFront(nil); return true }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        if model.dirty && !model.save() { return .terminateCancel }; return .terminateNow
+        if model != nil && model.dirty && !model.save() { return .terminateCancel }; return .terminateNow
     }
 }
 @main struct LifeApplication {
