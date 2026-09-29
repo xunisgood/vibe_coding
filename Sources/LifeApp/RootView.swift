@@ -29,7 +29,7 @@ struct RootView: View {
     }
     @ViewBuilder var content: some View {
         if model.page == "设置与数据" {
-            GroupBox("本地数据") { VStack(alignment: .leading) { Text(model.store.file.path).textSelection(.enabled); Button("打开所在文件夹") { NSWorkspace.shared.activateFileViewerSelecting([model.store.file]) } }.frame(maxWidth: .infinity, alignment: .leading).padding(12) }
+            SettingsView(model: model)
         } else { ContentUnavailableView("尚无记录", systemImage: "tray", description: Text("应用基础已就绪，业务模块正在开发。")) }
     }
 }
