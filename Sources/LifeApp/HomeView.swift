@@ -49,7 +49,7 @@ struct HomeView: View {
               Text(r.title)
               Text(r.date.formatted()).font(.caption).foregroundStyle(.secondary)
               Spacer()
-              Button("查看") {
+              IconAction("查看", systemImage: "eye") {
                 model.show(r.page, day: r.day)
                 model.focusedReminderID = r.id
               }
@@ -62,7 +62,7 @@ struct HomeView: View {
         Panel(title: "今日聚焦") {
           HStack {
             TextField("添加今日待办", text: $title).onSubmit(add)
-            Button("添加", action: add).buttonStyle(.borderedProminent).disabled(
+            IconAction("添加", systemImage: "plus", action: add).buttonStyle(.borderedProminent).disabled(
               title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
           }
           let pending = model.library.todos.filter { $0.day == model.today && !$0.done }
@@ -84,7 +84,7 @@ struct HomeView: View {
                   })
               ).toggleStyle(.checkbox)
               Spacer()
-              Button("详情") {
+              IconAction("详情", systemImage: "info") {
                 model.show("今日计划", day: model.today)
                 model.focusedReminderID = "life.todo." + t.id.uuidString
               }
@@ -109,7 +109,7 @@ struct HomeView: View {
               }
             }
           }
-          Button("查看今日计划") { model.show("今日计划", day: model.today) }.padding(.top, 8)
+          IconAction("查看今日计划", systemImage: "eye") { model.show("今日计划", day: model.today) }.padding(.top, 8)
         }.frame(maxWidth: .infinity)
         MemosView(model: model).frame(width: 250)
       }
@@ -129,29 +129,29 @@ struct HomeView: View {
               p.entries.filter { $0.kind == "进展" }.max { $0.updated < $1.updated }?.title
                 ?? "尚无进展记录"
             ).foregroundStyle(.secondary)
-            Button("查看项目") {
+            IconAction("查看项目", systemImage: "eye") {
               model.selectedProjectID = id
               model.page = "开发工作"
             }
           } else {
             Text("还没有正在进行的项目").foregroundStyle(.secondary)
-            Button("管理项目") { model.page = "开发工作" }
+            IconAction("管理项目", systemImage: "folder") { model.page = "开发工作" }
           }
         }
         Panel(title: "今日训练") {
           summaryIcon("figure.strengthtraining.traditional", color: .orange)
           Text("\(summary.trainingCount) 次安排 · \(summary.completedTrainings) 次完成")
-          Button("查看训练") { model.show("健身计划", day: model.today) }
+          IconAction("查看训练", systemImage: "eye") { model.show("健身计划", day: model.today) }
         }
         Panel(title: "饮食") {
           summaryIcon("fork.knife", color: .green)
           Text("今天已记录 \(summary.recordedMeals) 餐")
-          Button("记饮食") { model.show("饮食计划", day: model.today) }
+          IconAction("记饮食", systemImage: "plus") { model.show("饮食计划", day: model.today) }
         }
         Panel(title: "游戏娱乐") {
           summaryIcon("gamecontroller", color: .pink)
           Text("今天玩了 \(summary.gameMinutes) 分钟")
-          Button("记游戏") { model.show("游戏娱乐", day: model.today) }
+          IconAction("记游戏", systemImage: "plus") { model.show("游戏娱乐", day: model.today) }
         }
       }
     }.onGeometryChange(for: CGFloat.self) {

@@ -10,7 +10,7 @@ struct TrainingsView: View {
       HStack {
         Text("记录实际训练，计划不会被覆盖。").foregroundStyle(.secondary)
         Spacer()
-        Button("新建训练安排") {
+        IconAction("新建训练安排", systemImage: "plus") {
           var p = TrainingPlan()
           p.start = model.day
           p.once = model.day
@@ -36,7 +36,7 @@ struct TrainingsView: View {
               ).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Button("修改后续") { plan = p }
+            IconAction("修改后续", systemImage: "pencil") { plan = p }
             if p.end == nil || p.end! >= model.today {
               Button("取消后续") {
                 if model.confirm("取消后续训练？", detail: "将移除今天及之后未开始的安排和提醒，保留已有实际记录和历史。") {
@@ -112,11 +112,11 @@ struct PlanEditor: View {
         VStack(spacing: 12) {
           ForEach($plan.exercises) { $e in
             ExercisePlanEditor(exercise: $e)
-            Button("移除动作") { plan.exercises.removeAll { $0.id == e.id } }
+            IconAction("移除动作", systemImage: "trash") { plan.exercises.removeAll { $0.id == e.id } }
           }
         }
       }.frame(maxHeight: 260)
-      Button("添加动作") { plan.exercises.append(Exercise()) }
+      IconAction("添加动作", systemImage: "plus") { plan.exercises.append(Exercise()) }
       HStack {
         Button("取消") { dismiss() }
         Spacer()
@@ -190,7 +190,7 @@ struct TrainingRecordView: View {
             Text("提醒 " + r.formatted(date: .omitted, time: .shortened)).font(.caption)
           }
           Spacer()
-          Button("只改这一次") { single = t }
+          IconAction("只改这一次", systemImage: "pencil") { single = t }
         }
         ForEach(t.exercises) { e in
           VStack(alignment: .leading, spacing: 8) {
@@ -209,7 +209,7 @@ struct TrainingRecordView: View {
                   Text("kg")
                   Toggle("完成", isOn: setBinding(e.id, s.id, \.done))
                   Spacer()
-                  Button("删除组") {
+                  IconAction("删除组", systemImage: "trash") {
                     mutate { t in
                       if let i = t.exercises.firstIndex(where: { $0.id == e.id }) {
                         t.exercises[i].sets.removeAll { $0.id == s.id }
@@ -218,7 +218,7 @@ struct TrainingRecordView: View {
                   }
                 }
               }
-              Button("记录一组") {
+              IconAction("记录一组", systemImage: "plus") {
                 mutate { t in
                   if let i = t.exercises.firstIndex(where: { $0.id == e.id }) {
                     t.exercises[i].sets.append(SetRecord())
@@ -304,7 +304,7 @@ struct SingleTrainingEditor: View {
       if remind { DatePicker("时间", selection: $time, displayedComponents: .hourAndMinute) }
       ScrollView { ForEach($value.exercises) { $e in ExercisePlanEditor(exercise: $e) } }.frame(
         height: 250)
-      Button("添加动作") { value.exercises.append(Exercise()) }
+      IconAction("添加动作", systemImage: "plus") { value.exercises.append(Exercise()) }
       HStack {
         Button("取消") { dismiss() }
         Spacer()
@@ -332,7 +332,7 @@ struct TrainingLinks: View {
           Text(t.status).font(.caption).foregroundStyle(.secondary)
         }
         Spacer()
-        Button("记录训练") { model.show("健身计划", day: day) }
+        IconAction("记录训练", systemImage: "pencil") { model.show("健身计划", day: day) }
         if t.status != "已完成" && t.status != "已跳过" {
           Button("直接完成") { model.change { try $0.setTrainingStatus(t.id, "已完成") } }
         }

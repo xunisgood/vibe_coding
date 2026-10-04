@@ -11,7 +11,7 @@ struct TodosView: View {
       DayPicker(model: model)
       HStack {
         TextField("今天想做什么？", text: $title).onSubmit(add).accessibilityIdentifier("todo-input")
-        Button("添加", action: add).buttonStyle(.borderedProminent).disabled(
+        IconAction("添加", systemImage: "plus", action: add).buttonStyle(.borderedProminent).disabled(
           title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
       }
       Panel(title: "待完成") {
@@ -46,9 +46,17 @@ struct TodosView: View {
           DisclosureGroup("此前未完成 · \(earlier.count) 项") {
             ForEach(earlier) { t in
               HStack {
-                Text(t.title)
-                Text(t.day).font(.caption).foregroundStyle(.secondary)
-                Spacer()
+                HStack {
+                  Text(t.title)
+                  Text(t.day).font(.caption).foregroundStyle(.secondary)
+                  Spacer(minLength: 0)
+                }.frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+                  .contentShape(Rectangle())
+                  .onTapGesture { editing = t }
+                  .accessibilityAction(named: Text("查看详情")) { editing = t }
+                  .accessibilityIdentifier("earlier-open-\(t.title)")
+                  .help("查看详情")
+                IconAction("详情", systemImage: "info") { editing = t }
                 Button("移到今天") { model.change { try $0.moveTodo(t.id, to: model.today) } }
               }.padding(.vertical, 6)
             }
@@ -93,10 +101,14 @@ struct TodosView: View {
           Text("提醒 " + r.formatted(date: .omitted, time: .shortened)).font(.caption)
             .foregroundStyle(.secondary)
         }
-      }
-      Spacer()
-      Button("详情") { editing = t }
-      Button("删除") {
+      }.frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture { editing = t }
+        .accessibilityAction(named: Text("查看详情")) { editing = t }
+        .accessibilityIdentifier("todo-open-\(t.title)")
+        .help("查看详情")
+      IconAction("详情", systemImage: "info") { editing = t }
+      IconAction("删除", systemImage: "trash") {
         model.delete({ $0.todos.removeAll { $0.id == t.id } }, undo: { $0.todos.append(t) })
       }
     }.padding(.vertical, 8)
@@ -160,8 +172,11 @@ struct NotesView: View {
     HStack(alignment: .top, spacing: 20) {
       VStack(alignment: .leading, spacing: 12) {
         HStack {
-          TextField("搜索标题和正文", text: $query)
-          Button("新建") {
+          HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
+            TextField("搜索标题和正文", text: $query)
+          }
+          IconAction("新建", systemImage: "plus") {
             let n = Note()
             if model.change({ $0.notes.insert(n, at: 0) }) { selection = n.id }
           }
@@ -175,7 +190,7 @@ struct NotesView: View {
               Text(n.updated.formatted()).font(.caption).foregroundStyle(.secondary)
             }.frame(maxWidth: .infinity, alignment: .leading).padding(10).background(
               selection == n.id ? Color.accentColor.opacity(0.10) : .clear
-            ).cornerRadius(14)
+            ).cornerRadius(14).contentShape(RoundedRectangle(cornerRadius: 14))
           }.buttonStyle(.plain)
         }
         if model.library.matchingNotes(query).isEmpty {
@@ -193,7 +208,7 @@ struct NotesView: View {
           HStack {
             Text("自动保存").font(.caption).foregroundStyle(.secondary)
             Spacer()
-            Button("删除笔记") {
+            IconAction("删除笔记", systemImage: "trash") {
               model.delete({ $0.notes.removeAll { $0.id == id } }, undo: { $0.notes.append(n) })
               selection = nil
             }
@@ -258,11 +273,11 @@ struct MemosView: View {
                 model.page = "笔记"
               }
             }
-            Button("编辑") {
+            IconAction("编辑", systemImage: "pencil") {
               text = m.body
               editID = m.id
             }
-            Button("删除") {
+            IconAction("删除", systemImage: "trash") {
               model.delete({ $0.memos.removeAll { $0.id == m.id } }, undo: { $0.memos.append(m) })
             }
           }.font(.caption)

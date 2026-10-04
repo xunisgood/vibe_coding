@@ -176,3 +176,25 @@ struct NavigationPressStyle: ButtonStyle {
       .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: configuration.isPressed)
   }
 }
+
+/// Compact native action with a visible symbol and a descriptive spoken/hover label.
+struct IconAction: View {
+  let title: String
+  let systemImage: String
+  let action: () -> Void
+  init(_ title: String, systemImage: String, action: @escaping () -> Void) {
+    self.title = title
+    self.systemImage = systemImage
+    self.action = action
+  }
+  var body: some View {
+    Button(action: action) {
+      Image(systemName: systemImage)
+        .font(.system(size: 14, weight: .medium))
+        .frame(minWidth: 22, minHeight: 24)
+        .contentShape(Rectangle())
+    }
+    .help(title)
+    .accessibilityLabel(title)
+  }
+}

@@ -44,11 +44,85 @@ final class PersonalLifeUITests: XCTestCase {
     }
     XCTAssertTrue(app.staticTexts["本地数据"].exists)
   }
+  func testIconActionsKeepAccessibleNamesAndNoteDeletionUndo() {
+    click("nav-6")
+    let create = app.buttons["新建"]
+    XCTAssertTrue(create.isHittable)
+    XCTAssertEqual(create.staticTexts.count, 0)
+    click("新建")
+    enter("标题", "Icon-note")
+    let delete = app.buttons["删除笔记"]
+    XCTAssertTrue(delete.isHittable)
+    XCTAssertEqual(delete.staticTexts.count, 0)
+    screenshot("note-icon-actions")
+    click("删除笔记")
+    XCTAssertFalse(app.textFields["标题"].exists)
+    click("撤销")
+    let note = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Icon-note")).firstMatch
+    XCTAssertTrue(note.exists)
+    // This test isolates the icon actions; the row hit area has its own regression test.
+    note.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.25)).click()
+    XCTAssertEqual(app.textFields["标题"].value as? String, "Icon-note")
+  }
   func expandCompleted() {
     let toggle = app.buttons["completed-toggle"]
     XCTAssertTrue(toggle.waitForExistence(timeout: 5))
     if (toggle.value as? String) == "收起" { toggle.click() }
     XCTAssertEqual(toggle.value as? String, "展开", app.debugDescription)
+  }
+  func testNoteRowBlankAreaSelectsAndPreservesEdits() {
+    click("nav-6")
+    click("新建")
+    enter("标题", "First")
+    app.textViews.firstMatch.click()
+    app.textViews.firstMatch.typeText("First body")
+    click("新建")
+    enter("标题", "Second")
+    let first = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "First、")).firstMatch
+    XCTAssertTrue(first.exists)
+    // Hit the padded empty right edge, away from both title and timestamp.
+    first.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).click()
+    XCTAssertEqual(app.textFields["标题"].value as? String, "First")
+    XCTAssertEqual(app.textViews.firstMatch.value as? String, "First body")
+    enter("标题", "First edited")
+    let second = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Second、")).firstMatch
+    second.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).click()
+    XCTAssertEqual(app.textFields["标题"].value as? String, "Second")
+    app.terminate()
+    app.launch()
+    click("nav-6")
+    let restored = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "First edited")).firstMatch
+    restored.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).click()
+    XCTAssertEqual(app.textFields["标题"].value as? String, "First edited")
+    XCTAssertEqual(app.textViews.firstMatch.value as? String, "First body")
+    screenshot("note-full-row-selection")
+  }
+  func testPendingTodoRowOpensDetailsWithoutCompleting() {
+    click("nav-1")
+    enter("todo-input", "Pending")
+    click("添加")
+    let row = app.descendants(matching: .any).matching(identifier: "todo-open-Pending").firstMatch
+    XCTAssertTrue(row.exists)
+    row.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5)).click()
+    XCTAssertTrue(app.staticTexts["待办详情"].waitForExistence(timeout: 5))
+    XCTAssertEqual(app.textFields["名称（必填）"].value as? String, "Pending")
+    enter("名称（必填）", "Pending edited")
+    app.textViews.firstMatch.click()
+    app.textViews.firstMatch.typeText("Keep this detail")
+    click("保存")
+    XCTAssertEqual((app.checkBoxes["完成"].firstMatch.value as? NSNumber)?.intValue, 0)
+    app.terminate()
+    app.launch()
+    click("nav-1")
+    let restored = app.descendants(matching: .any).matching(identifier: "todo-open-Pending edited").firstMatch
+    restored.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5)).click()
+    XCTAssertEqual(app.textViews.firstMatch.value as? String, "Keep this detail")
+    screenshot("pending-todo-details")
+    click("取消")
+    XCTAssertEqual((app.checkBoxes["完成"].firstMatch.value as? NSNumber)?.intValue, 0)
+    app.checkBoxes["完成"].firstMatch.click()
+    expandCompleted()
+    XCTAssertEqual((app.checkBoxes["完成"].firstMatch.value as? NSNumber)?.intValue, 1)
   }
   func testTodoCompletionUndoAndRelaunch() {
     click("nav-1")

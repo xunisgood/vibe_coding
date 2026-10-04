@@ -53,7 +53,7 @@ struct MealEditor: View {
         Button("按计划吃了") { model.change { try $0.eatAsPlanned(meal.id) } }.disabled(
           meal.planned.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         Spacer()
-        Button("清除本餐") {
+        IconAction("清除本餐", systemImage: "trash") {
           let m = meal
           model.delete({ $0.meals.removeAll { $0.id == m.id } }, undo: { $0.meals.append(m) })
         }.disabled(!model.library.meals.contains { $0.day == day && $0.slot == slot })
@@ -98,7 +98,7 @@ struct GamesView: View {
           Text("快乐也值得被记录").font(.caption).foregroundStyle(.secondary)
         }
         Spacer()
-        Button("记录游戏") { edit = Game(day: model.day, name: "", minutes: 30) }.buttonStyle(
+        IconAction("记录游戏", systemImage: "plus") { edit = Game(day: model.day, name: "", minutes: 30) }.buttonStyle(
           .borderedProminent)
       }
       let games = model.library.games.filter { $0.day == model.day }
@@ -112,8 +112,8 @@ struct GamesView: View {
             Label("\(g.minutes/60) 小时 \(g.minutes%60) 分钟", systemImage: "clock")
               .font(.system(size: 19, weight: .medium, design: .rounded)).foregroundStyle(.pink)
             Spacer()
-            Button("编辑") { edit = g }
-            Button("删除") {
+            IconAction("编辑", systemImage: "pencil") { edit = g }
+            IconAction("删除", systemImage: "trash") {
               model.delete({ $0.games.removeAll { $0.id == g.id } }, undo: { $0.games.append(g) })
             }
           }
@@ -191,7 +191,7 @@ struct ProjectsView: View {
       HStack {
         Toggle("查看归档", isOn: $showArchived)
         Spacer()
-        Button("新建项目") { editProject = Project("") }.buttonStyle(.borderedProminent)
+        IconAction("新建项目", systemImage: "plus") { editProject = Project("") }.buttonStyle(.borderedProminent)
       }
       HStack(alignment: .top, spacing: 18) {
         VStack(alignment: .leading, spacing: 12) {
@@ -225,12 +225,12 @@ struct ProjectsView: View {
             HStack {
               Text(p.name).font(.title2)
               Spacer()
-              Button("编辑") { editProject = p }
+              IconAction("编辑", systemImage: "pencil") { editProject = p }
               Button(p.archived ? "恢复" : "归档") {
                 model.change { try $0.archiveProject(id, archived: !p.archived) }
                 selected = nil
               }
-              Button("删除") {
+              IconAction("删除", systemImage: "trash") {
                 if model.confirm(
                   "删除项目？", detail: "将删除“\(p.name)”及其 \(p.entries.count) 条任务、问题、笔记和进展。")
                 {
@@ -303,7 +303,7 @@ struct ProjectEntriesView: View {
       Picker("内容", selection: $kind) {
         ForEach(["任务", "问题", "笔记", "进展"], id: \.self) { Text($0).tag($0) }
       }.pickerStyle(.segmented)
-      Button("添加\(kind)") {
+      IconAction("添加\(kind)", systemImage: "plus") {
         var e = DevEntry()
         e.kind = kind
         edit = e
@@ -317,8 +317,8 @@ struct ProjectEntriesView: View {
               Text(e.status).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Button("编辑") { edit = e }
-            Button("删除") {
+            IconAction("编辑", systemImage: "pencil") { edit = e }
+            IconAction("删除", systemImage: "trash") {
               model.delete(
                 { l in
                   if let i = l.projects.firstIndex(where: { $0.id == projectID }) {

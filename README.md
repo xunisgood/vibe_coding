@@ -105,6 +105,7 @@ bash scripts/test-reboot.sh verify
 
 ## 文档
 
+- [版本说明：视觉与交互修订（2026-10-04）](docs/VERSION_NOTES_2026-10-04.md)
 - [视觉重构与兼容说明](docs/VISUAL_REDESIGN.md)
 - [PRD](PRD.md)
 - [开发计划](DEVELOPMENT_PLAN.md)
