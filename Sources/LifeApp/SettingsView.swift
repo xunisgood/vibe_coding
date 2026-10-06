@@ -47,3 +47,27 @@ struct NotificationSettings: View {
     }
   }
 }
+
+struct SettingsWindowContent: View {
+  @ObservedObject var model: AppModel
+  var body: some View {
+    ScrollView {
+      VStack(alignment: .leading, spacing: 18) {
+        Text("设置与数据").font(.system(size: 22, weight: .semibold))
+        if let warning = model.workspaceWarning { Text(warning).foregroundStyle(.orange) }
+        if model.dirty { Button("重试保存") { model.save() } }
+        SettingsView(model: model)
+      }.padding(24)
+    }.background(LifeBackdrop()).controlSize(.regular)
+      .alert(
+        "需要处理",
+        isPresented: Binding(
+          get: { model.error != nil && NSApp.keyWindow?.title == "设置与数据" },
+          set: { if !$0 { model.error = nil } })
+      ) {
+        Button("知道了") { model.error = nil }
+      } message: {
+        Text(model.error ?? "")
+      }
+  }
+}

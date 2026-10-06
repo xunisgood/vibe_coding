@@ -3,8 +3,11 @@ import LifeCore
 import SwiftUI
 import UserNotifications
 
-@MainActor final class AppDelegate: NSObject, NSApplicationDelegate {
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, NSWindowDelegate {
   var window: NSWindow!
+  var settingsWindow: NSWindow?
+  private var restoringWindow = true
   var model: AppModel!
   var lastDay = Day.key(Date())
   var timer: Timer?
@@ -35,15 +38,34 @@ import UserNotifications
       contentRect: NSRect(x: 0, y: 0, width: 1100, height: 760),
       styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false
     )
+    window.delegate = self
     window.title = "我的日常"
     window.titlebarAppearsTransparent = true
     window.titlebarSeparatorStyle = .none
     window.backgroundColor = .windowBackgroundColor
     window.isReleasedWhenClosed = false
     window.minSize = NSSize(width: 880, height: 620)
-    window.contentView = NSHostingView(rootView: RootView(model: model))
-    window.center()
+    model.openSettings = { [weak self] in self?.showSettings() }
+    if Bundle.main.bundleIdentifier == "com.xunisgood.personallife.uitestapp",
+      args.contains("--ui-reduced-effects")
+    {
+      window.contentView = NSHostingView(
+        rootView: RootView(model: model)
+          .environment(\.lifeReducedEffects, true))
+    } else {
+      window.contentView = NSHostingView(rootView: RootView(model: model))
+    }
+    if let saved = model.windowFrame,
+      let frame = WorkspaceState.fittedFrame(
+        NSRectFromString(saved), screens: NSScreen.screens.map(\.visibleFrame))
+    {
+      window.setFrame(frame, display: false)
+    } else {
+      window.center()
+    }
     window.makeKeyAndOrderFront(nil)
+    restoringWindow = false
+    model.recordWindowFrame(window.frame)
     let menu = NSMenu()
     let appItem = NSMenuItem()
     let submenu = NSMenu()
@@ -65,6 +87,27 @@ import UserNotifications
     windowMenu.submenu?.addItem(
       withTitle: "关闭窗口", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
     menu.addItem(windowMenu)
+    let file = NSMenuItem()
+    file.title = "文件"
+    file.submenu = NSMenu(title: "文件")
+    let new = NSMenuItem(title: "新建", action: #selector(newCurrent), keyEquivalent: "n")
+    new.target = self
+    file.submenu?.addItem(new)
+    menu.insertItem(file, at: 1)
+    let find = NSMenuItem(title: "查找…", action: #selector(findCurrent), keyEquivalent: "f")
+    find.target = self
+    edit.submenu?.addItem(find)
+    let settings = NSMenuItem(title: "设置…", action: #selector(showSettings), keyEquivalent: ",")
+    settings.target = self
+    submenu.insertItem(settings, at: 0)
+    let view = NSMenuItem()
+    view.title = "显示"
+    view.submenu = NSMenu(title: "显示")
+    let sidebar = NSMenuItem(title: "显示或隐藏导航", action: #selector(toggleSidebar), keyEquivalent: "s")
+    sidebar.keyEquivalentModifierMask = [.command, .option]
+    sidebar.target = self
+    view.submenu?.addItem(sidebar)
+    menu.insertItem(view, at: 3)
     NSApp.mainMenu = menu
     NSApp.activate(ignoringOtherApps: true)
     model.notifications.model = model
@@ -99,6 +142,46 @@ import UserNotifications
       }
     }
   }
+  @objc func newCurrent() { model.requestNew() }
+  @objc func findCurrent() { model.requestSearch() }
+  @objc func toggleSidebar() { model.sidebarVisible.toggle() }
+  @objc func showSettings() {
+    guard model.prepareToLeave?() ?? true else { return }
+    if settingsWindow == nil {
+      let panel = NSWindow(
+        contentRect: NSRect(x: 0, y: 0, width: 680, height: 660),
+        styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+      panel.title = "设置与数据"
+      panel.isReleasedWhenClosed = false
+      panel.minSize = NSSize(width: 600, height: 500)
+      panel.contentView = NSHostingView(rootView: SettingsWindowContent(model: model))
+      panel.center()
+      settingsWindow = panel
+    }
+    settingsWindow?.makeKeyAndOrderFront(nil)
+  }
+  func validateMenuItem(_ item: NSMenuItem) -> Bool {
+    let active = NSApp.keyWindow === window && window.attachedSheet == nil
+    if item.action == #selector(showSettings) { return NSApp.keyWindow?.attachedSheet == nil }
+    if item.action == #selector(newCurrent) {
+      item.title = model.newTitle ?? "新建"
+      return active && model.newTitle != nil && !model.locked
+    }
+    if item.action == #selector(findCurrent) { return active && model.canSearch }
+    return active
+  }
+  func windowDidMove(_ notification: Notification) { rememberWindow(notification) }
+  func windowDidResize(_ notification: Notification) { rememberWindow(notification) }
+  private func rememberWindow(_ notification: Notification) {
+    if !restoringWindow, let changed = notification.object as? NSWindow, changed === window,
+      model != nil
+    {
+      model.recordWindowFrame(changed.frame)
+    }
+  }
+  func windowShouldClose(_ sender: NSWindow) -> Bool {
+    sender !== window || (model.prepareToLeave?() ?? true)
+  }
   func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
   func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool
   {
@@ -106,6 +189,7 @@ import UserNotifications
     return true
   }
   func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+    if model != nil && !(model.prepareToLeave?() ?? true) { return .terminateCancel }
     if model != nil && model.dirty && !model.save() { return .terminateCancel }
     return .terminateNow
   }

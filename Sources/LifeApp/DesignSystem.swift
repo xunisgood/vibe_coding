@@ -1,6 +1,14 @@
 import AppKit
 import SwiftUI
 
+private struct ReducedEffectsKey: EnvironmentKey { static let defaultValue = false }
+extension EnvironmentValues {
+  var lifeReducedEffects: Bool {
+    get { self[ReducedEffectsKey.self] }
+    set { self[ReducedEffectsKey.self] = newValue }
+  }
+}
+
 enum LifeStyle {
   static let accents: [Color] = [.indigo, .blue, .purple, .orange, .green, .pink, .teal, .gray]
   // Darker selection colors keep small white navigation labels readable in light appearance.
@@ -21,7 +29,9 @@ enum LifeStyle {
 
 struct GlassSurface: ViewModifier {
   var radius: CGFloat = 22
-  @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+  @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
+  @Environment(\.lifeReducedEffects) private var forcedReducedEffects
+  private var reduceTransparency: Bool { systemReduceTransparency || forcedReducedEffects }
   @Environment(\.colorScheme) private var scheme
   func body(content: Content) -> some View {
     if reduceTransparency {
@@ -88,7 +98,9 @@ struct NavigationItem: View {
   let action: () -> Void
   @State private var hovering = false
   @Environment(\.colorScheme) private var scheme
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+  @Environment(\.lifeReducedEffects) private var forcedReducedEffects
+  private var reduceMotion: Bool { systemReduceMotion || forcedReducedEffects }
   var body: some View {
     Button(action: action) {
       HStack(spacing: 12) {
@@ -169,7 +181,9 @@ struct MetricTile: View {
 }
 
 struct NavigationPressStyle: ButtonStyle {
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+  @Environment(\.lifeReducedEffects) private var forcedReducedEffects
+  private var reduceMotion: Bool { systemReduceMotion || forcedReducedEffects }
   func makeBody(configuration: Configuration) -> some View {
     configuration.label.opacity(configuration.isPressed ? 0.82 : 1)
       .scaleEffect(reduceMotion || !configuration.isPressed ? 1 : 0.985)
@@ -179,6 +193,8 @@ struct NavigationPressStyle: ButtonStyle {
 
 /// Compact native action with a visible symbol and a descriptive spoken/hover label.
 struct IconAction: View {
+  @State private var hovering = false
+  @Environment(\.isEnabled) private var enabled
   let title: String
   let systemImage: String
   let action: () -> Void
@@ -194,6 +210,10 @@ struct IconAction: View {
         .frame(minWidth: 22, minHeight: 24)
         .contentShape(Rectangle())
     }
+    .background(
+      .primary.opacity(hovering && enabled ? 0.055 : 0), in: RoundedRectangle(cornerRadius: 8)
+    )
+    .onHover { hovering = $0 }
     .help(title)
     .accessibilityLabel(title)
   }

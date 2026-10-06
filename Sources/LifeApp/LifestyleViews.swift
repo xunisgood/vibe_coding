@@ -4,7 +4,6 @@ import SwiftUI
 struct MealsView: View {
   @ObservedObject var model: AppModel
   var body: some View {
-    DayPicker(model: model)
     let n = model.library.nutrition(on: model.day)
     HStack(spacing: 16) {
       MetricTile(
@@ -88,9 +87,10 @@ struct MealEditor: View {
 struct GamesView: View {
   @ObservedObject var model: AppModel
   @State private var edit: Game?
+  @State private var query = ""
+  @FocusState private var searchFocused: Bool
   var body: some View {
     VStack(alignment: .leading, spacing: 18) {
-      DayPicker(model: model)
       HStack {
         VStack(alignment: .leading, spacing: 5) {
           Text("今日游戏：\(model.library.gameMinutes(on:model.day)) 分钟")
@@ -98,13 +98,16 @@ struct GamesView: View {
           Text("快乐也值得被记录").font(.caption).foregroundStyle(.secondary)
         }
         Spacer()
-        IconAction("记录游戏", systemImage: "plus") { edit = Game(day: model.day, name: "", minutes: 30) }.buttonStyle(
-          .borderedProminent)
+
       }
-      let games = model.library.games.filter { $0.day == model.day }
+      TextField("搜索游戏名称", text: $query).focused($searchFocused)
+      let games = model.library.games.filter {
+        $0.day == model.day && (query.isEmpty || $0.name.localizedCaseInsensitiveContains(query))
+      }
       if games.isEmpty {
         LifeEmptyState(
-          "还没有游戏记录", systemImage: "gamecontroller", description: Text("玩过之后，记下名称和时长即可"))
+          query.isEmpty ? "还没有游戏记录" : "没有匹配的游戏", systemImage: "gamecontroller",
+          description: Text("可切换日期或调整搜索内容"))
       }
       ForEach(games) { g in
         Panel(title: g.name) {
@@ -120,7 +123,9 @@ struct GamesView: View {
           if !g.note.isEmpty { Text(g.note).foregroundStyle(.secondary) }
         }
       }
-    }.sheet(item: $edit) { g in GameEditor(model: model, original: g) }
+    }.onChange(of: model.searchRequest) { _, _ in searchFocused = true }
+      .onChange(of: model.newRequest) { _, _ in edit = Game(day: model.day, name: "", minutes: 30) }
+      .sheet(item: $edit) { g in GameEditor(model: model, original: g) }
   }
 }
 struct GameEditor: View {
@@ -183,76 +188,111 @@ struct GameEditor: View {
 }
 struct ProjectsView: View {
   @ObservedObject var model: AppModel
-  @State private var selected: UUID?
   @State private var showArchived = false
   @State private var editProject: Project?
+  @FocusState private var rowFocused: UUID?
+  var projects: [Project] {
+    model.library.projects.filter { $0.archived == showArchived }.sorted { $0.updated > $1.updated }
+  }
   var body: some View {
-    VStack(alignment: .leading, spacing: 18) {
-      HStack {
-        Toggle("查看归档", isOn: $showArchived)
-        Spacer()
-        IconAction("新建项目", systemImage: "plus") { editProject = Project("") }.buttonStyle(.borderedProminent)
-      }
-      HStack(alignment: .top, spacing: 18) {
-        VStack(alignment: .leading, spacing: 12) {
-          ForEach(
-            model.library.projects.filter { $0.archived == showArchived }.sorted {
-              $0.updated > $1.updated
-            }
-          ) { p in
-            Button {
-              selected = p.id
-            } label: {
-              VStack(alignment: .leading, spacing: 5) {
-                Text(p.name).font(.headline)
-                Text(
-                  p.entries.first { ["任务", "问题"].contains($0.kind) && $0.status != "已完成" }?.title
-                    ?? "暂无待处理任务"
-                ).font(.caption).foregroundStyle(.secondary)
-                Text(p.updated.formatted(date: .abbreviated, time: .omitted)).font(.caption2)
-              }.padding(10).frame(maxWidth: .infinity, alignment: .leading).background(
-                selected == p.id ? Color.accentColor.opacity(0.12) : .clear
-              ).cornerRadius(14)
-            }.buttonStyle(.plain)
-          }
-          if !model.library.projects.contains(where: { $0.archived == showArchived }) {
-            Text("暂无项目").foregroundStyle(.secondary)
-          }
-        }.padding(14).frame(width: 214).lifeCard()
-        Divider().overlay(.primary.opacity(0.04))
-        if let id = selected, let p = model.library.projects.first(where: { $0.id == id }) {
-          VStack(alignment: .leading, spacing: 16) {
-            HStack {
-              Text(p.name).font(.title2)
-              Spacer()
-              IconAction("编辑", systemImage: "pencil") { editProject = p }
-              Button(p.archived ? "恢复" : "归档") {
-                model.change { try $0.archiveProject(id, archived: !p.archived) }
-                selected = nil
-              }
-              IconAction("删除", systemImage: "trash") {
-                if model.confirm(
-                  "删除项目？", detail: "将删除“\(p.name)”及其 \(p.entries.count) 条任务、问题、笔记和进展。")
-                {
-                  model.delete(
-                    { $0.projects.removeAll { $0.id == id } }, undo: { $0.projects.append(p) })
-                  selected = nil
-                }
-              }
-            }
-            if !p.detail.isEmpty { Text(p.detail).foregroundStyle(.secondary) }
-            ProjectEntriesView(model: model, projectID: id).id(id)
-          }
-        } else {
-          LifeEmptyState("选择一个项目", systemImage: "folder", description: Text("记录任务、问题和开发进展"))
-        }
-      }
+    HSplitView {
+      projectList
+      projectDetail
     }.onAppear {
       if let id = model.selectedProjectID {
-        selected = id
         showArchived = model.library.projects.first { $0.id == id }?.archived ?? false
       }
-    }.sheet(item: $editProject) { p in ProjectEditor(model: model, original: p) }
+    }
+    .onChange(of: model.newRequest) { _, _ in editProject = Project("") }
+    .onChange(of: showArchived) { _, value in
+      if !model.library.projects.contains(where: {
+        $0.id == model.selectedProjectID && $0.archived == value
+      }) {
+        model.selectedProjectID = nil
+      }
+    }
+    .sheet(item: $editProject) { p in ProjectEditor(model: model, original: p) }
+  }
+  private var projectList: some View {
+    VStack(alignment: .leading, spacing: 12) {
+      Toggle("查看归档", isOn: $showArchived)
+      ScrollView {
+        LazyVStack(alignment: .leading, spacing: 8) {
+          ForEach(projects) { p in projectRow(p) }
+          if projects.isEmpty { Text("暂无项目").foregroundStyle(.secondary) }
+        }
+      }
+    }.padding(12).frame(minWidth: 190, idealWidth: 214, maxWidth: 270, maxHeight: .infinity)
+      .background(.primary.opacity(0.025), in: RoundedRectangle(cornerRadius: 14))
+  }
+  private func projectRow(_ p: Project) -> some View {
+    Button {
+      model.selectedProjectID = p.id
+      rowFocused = p.id
+    } label: {
+      VStack(alignment: .leading, spacing: 5) {
+        Text(p.name).font(.headline).lineLimit(2)
+        Text(
+          p.entries.first { ["任务", "问题"].contains($0.kind) && $0.status != "已完成" }?.title
+            ?? "暂无待处理任务"
+        )
+        .font(.caption).foregroundStyle(.secondary).lineLimit(2)
+        Text(p.updated.formatted(date: .abbreviated, time: .omitted)).font(.caption2)
+      }.padding(10).frame(maxWidth: .infinity, alignment: .leading)
+        .background(model.selectedProjectID == p.id ? Color.accentColor.opacity(0.12) : .clear)
+        .clipShape(RoundedRectangle(cornerRadius: 12)).contentShape(Rectangle())
+    }.buttonStyle(.plain).focusable().focused($rowFocused, equals: p.id)
+      .onKeyPress(.downArrow) {
+        move(p.id, 1)
+        return .handled
+      }
+      .onKeyPress(.upArrow) {
+        move(p.id, -1)
+        return .handled
+      }
+      .contextMenu {
+        Button("编辑项目") { editProject = p }
+        Button(p.archived ? "恢复" : "归档") { archive(p) }
+        Button("删除项目", role: .destructive) { remove(p) }
+      }
+  }
+  private var projectDetail: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      if let id = model.selectedProjectID,
+        let p = model.library.projects.first(where: { $0.id == id })
+      {
+        HStack {
+          Text(p.name).font(.title2).lineLimit(2)
+          Spacer()
+          IconAction("编辑", systemImage: "pencil") { editProject = p }
+          Button(p.archived ? "恢复" : "归档") { archive(p) }
+          IconAction("删除", systemImage: "trash") { remove(p) }
+        }
+        if !p.detail.isEmpty { Text(p.detail).foregroundStyle(.secondary).lineLimit(3) }
+        ProjectEntriesView(model: model, projectID: id).id(id)
+      } else {
+        LifeEmptyState("选择一个项目", systemImage: "folder", description: Text("记录任务、问题和开发进展"))
+        Spacer()
+      }
+    }.padding(.leading, 16).frame(minWidth: 310, maxWidth: .infinity, maxHeight: .infinity)
+  }
+  func move(_ id: UUID, _ delta: Int) {
+    guard let i = projects.firstIndex(where: { $0.id == id }), !projects.isEmpty else { return }
+    let p = projects[min(max(i + delta, 0), projects.count - 1)]
+    model.selectedProjectID = p.id
+    rowFocused = p.id
+  }
+  func archive(_ p: Project) {
+    if model.change({ try $0.archiveProject(p.id, archived: !p.archived) }) {
+      model.selectedProjectID = nil
+    }
+  }
+  func remove(_ p: Project) {
+    guard model.confirm("删除项目？", detail: "将删除“\(p.name)”及其 \(p.entries.count) 条任务、问题、笔记和进展。") else {
+      return
+    }
+    model.delete({ $0.projects.removeAll { $0.id == p.id } }, undo: { $0.projects.append(p) })
+    if !model.library.projects.contains(where: { $0.id == p.id }) { model.selectedProjectID = nil }
   }
 }
 struct ProjectEditor: View {
@@ -308,32 +348,36 @@ struct ProjectEntriesView: View {
         e.kind = kind
         edit = e
       }
-      if entries.isEmpty { Text("暂无\(kind)").foregroundStyle(.secondary) }
-      ForEach(entries) { e in
-        Panel(title: e.title) {
-          HStack {
-            Text(e.day).font(.caption)
-            if kind == "任务" || kind == "问题" {
-              Text(e.status).font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            IconAction("编辑", systemImage: "pencil") { edit = e }
-            IconAction("删除", systemImage: "trash") {
-              model.delete(
-                { l in
-                  if let i = l.projects.firstIndex(where: { $0.id == projectID }) {
-                    l.projects[i].entries.removeAll { $0.id == e.id }
-                    l.projects[i].updated = Date()
-                  }
-                },
-                undo: { l in
-                  if let i = l.projects.firstIndex(where: { $0.id == projectID }) {
-                    l.projects[i].entries.append(e)
-                  }
-                })
+      ScrollView {
+        VStack(alignment: .leading, spacing: 12) {
+          if entries.isEmpty { Text("暂无\(kind)").foregroundStyle(.secondary) }
+          ForEach(entries) { e in
+            Panel(title: e.title) {
+              HStack {
+                Text(e.day).font(.caption)
+                if kind == "任务" || kind == "问题" {
+                  Text(e.status).font(.caption).foregroundStyle(.secondary)
+                }
+                Spacer()
+                IconAction("编辑", systemImage: "pencil") { edit = e }
+                IconAction("删除", systemImage: "trash") {
+                  model.delete(
+                    { l in
+                      if let i = l.projects.firstIndex(where: { $0.id == projectID }) {
+                        l.projects[i].entries.removeAll { $0.id == e.id }
+                        l.projects[i].updated = Date()
+                      }
+                    },
+                    undo: { l in
+                      if let i = l.projects.firstIndex(where: { $0.id == projectID }) {
+                        l.projects[i].entries.append(e)
+                      }
+                    })
+                }
+              }
+              if !e.body.isEmpty { Text(e.body).textSelection(.enabled) }
             }
           }
-          if !e.body.isEmpty { Text(e.body).textSelection(.enabled) }
         }
       }
     }.sheet(item: $edit) { e in EntryEditor(model: model, projectID: projectID, original: e) }

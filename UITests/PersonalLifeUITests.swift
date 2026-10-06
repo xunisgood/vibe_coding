@@ -27,11 +27,15 @@ final class PersonalLifeUITests: XCTestCase {
     if let originalInputSource { XCTAssertEqual(TISSelectInputSource(originalInputSource), noErr) }
   }
   func click(_ label: String) {
+    if label.hasPrefix("nav-"), app.windows["设置与数据"].exists {
+      app.windows["设置与数据"].buttons["_XCUI:CloseWindow"].click()
+    }
     let b = app.buttons[label].firstMatch
     XCTAssertTrue(b.waitForExistence(timeout: 5), app.debugDescription)
     b.click()
   }
   func screenshot(_ name: String) {
+    app.activate()
     let a = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
     a.name = name
     a.lifetime = .keepAlways
@@ -43,6 +47,148 @@ final class PersonalLifeUITests: XCTestCase {
       screenshot("empty-page-\(i)")
     }
     XCTAssertTrue(app.staticTexts["本地数据"].exists)
+  }
+  func testToolbarCommandsAndSidebar() {
+    click("nav-6")
+    app.typeKey("n", modifierFlags: .command)
+    XCTAssertTrue(app.textFields["标题"].waitForExistence(timeout: 5))
+    enter("标题", "Keyboard note")
+    app.typeKey("f", modifierFlags: .command)
+    app.typeText("Keyboard")
+    XCTAssertEqual(app.textFields["搜索标题和正文"].value as? String, "Keyboard")
+    click("toggle-sidebar")
+    XCTAssertFalse(app.buttons["nav-0"].exists)
+    app.typeKey("s", modifierFlags: [.command, .option])
+    XCTAssertTrue(app.buttons["nav-0"].waitForExistence(timeout: 5))
+    click("nav-1")
+    app.typeKey("n", modifierFlags: .command)
+    app.typeText("Keyboard task")
+    app.typeKey(.return, modifierFlags: [])
+    XCTAssertTrue(app.staticTexts["Keyboard task"].exists)
+    screenshot("fixed-toolbar-keyboard")
+  }
+  func testNotesKeyboardSelectionAndIndependentScrolling() {
+    click("nav-6")
+    app.typeKey("n", modifierFlags: .command)
+    app.typeText("Older")
+    app.textViews.firstMatch.click()
+    app.textViews.firstMatch.typeText(String(repeating: "Long body line\n", count: 45))
+    app.typeKey("n", modifierFlags: .command)
+    app.typeText("Newer")
+    let newer = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Newer")).firstMatch
+    newer.click()
+    app.typeKey(.downArrow, modifierFlags: [])
+    XCTAssertEqual(app.textFields["标题"].value as? String, "Older")
+    let searchFrame = app.textFields["搜索标题和正文"].frame
+    app.textViews.firstMatch.scroll(byDeltaX: 0, deltaY: -600)
+    XCTAssertEqual(app.textFields["搜索标题和正文"].frame, searchFrame)
+    XCTAssertTrue(newer.isHittable)
+    app.typeKey(.upArrow, modifierFlags: [])
+    XCTAssertEqual(app.textFields["标题"].value as? String, "Newer")
+    click("nav-0")
+    click("nav-6")
+    XCTAssertEqual(app.textFields["标题"].value as? String, "Newer")
+    screenshot("notes-independent-workspace")
+  }
+  func testWideTodoDraftSurvivesResizeAndGuardsNavigation() {
+    click("nav-1")
+    enter("todo-input", "Draft task")
+    click("添加")
+    click("toggle-sidebar")
+    click("详情")
+    XCTAssertFalse(app.sheets.firstMatch.exists)
+    XCTAssertTrue(app.staticTexts["待办详情"].exists)
+    screenshot("wide-todo-inspector")
+    enter("名称（必填）", "Draft changed")
+    click("toggle-sidebar")
+    XCTAssertTrue(app.sheets.firstMatch.waitForExistence(timeout: 5))
+    XCTAssertEqual(app.textFields["名称（必填）"].value as? String, "Draft changed")
+    click("保存")
+    XCTAssertTrue(app.staticTexts["Draft changed"].exists)
+    click("toggle-sidebar")
+    click("详情")
+    enter("名称（必填）", "Discard this")
+    click("toggle-sidebar")
+    // In the narrow sheet, Cancel discards only the current draft.
+    click("取消")
+    XCTAssertTrue(app.staticTexts["Draft changed"].exists)
+    XCTAssertFalse(app.staticTexts["Discard this"].exists)
+    click("toggle-sidebar")
+    click("详情")
+    enter("名称（必填）", "Saved on exit")
+    app.typeKey("q", modifierFlags: .command)
+    click("继续编辑")
+    XCTAssertEqual(app.textFields["名称（必填）"].value as? String, "Saved on exit")
+    app.typeKey("q", modifierFlags: .command)
+    click("保存修改")
+    XCTAssertTrue(app.wait(for: .notRunning, timeout: 5))
+    app.launch()
+    // The collapsed sidebar is now restored across launch.
+    if !app.buttons["nav-1"].exists { click("toggle-sidebar") }
+    click("nav-1")
+    XCTAssertTrue(app.staticTexts["Saved on exit"].exists)
+  }
+  func testWorkspaceRestorationAndIndependentSettings() {
+    click("nav-6")
+    click("新建")
+    enter("标题", "Remember selection")
+    let main = app.windows["我的日常"]
+    let corner = main.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1)).withOffset(
+      CGVector(dx: -2, dy: -2))
+    corner.click(forDuration: 0.2, thenDragTo: corner.withOffset(CGVector(dx: -100, dy: -80)))
+    let size = main.frame.size
+    app.typeKey(",", modifierFlags: .command)
+    XCTAssertTrue(app.windows["设置与数据"].waitForExistence(timeout: 5))
+    XCTAssertTrue(main.exists)
+    XCTAssertTrue(app.windows["设置与数据"].staticTexts["本地数据"].exists)
+    app.windows["设置与数据"].buttons["_XCUI:CloseWindow"].click()
+    XCTAssertEqual(app.textFields["标题"].value as? String, "Remember selection")
+    click("toggle-sidebar")
+    app.terminate()
+    app.launch()
+    XCTAssertFalse(app.buttons["nav-0"].exists)
+    XCTAssertEqual(app.textFields["标题"].value as? String, "Remember selection")
+    XCTAssertEqual(app.windows["我的日常"].frame.width, size.width, accuracy: 2)
+    XCTAssertEqual(app.windows["我的日常"].frame.height, size.height, accuracy: 2)
+    click("toggle-sidebar")
+    screenshot("restored-workspace")
+  }
+  func testReducedEffectsContextMenuAndSafeTextDeletion() {
+    app.terminate()
+    app.launchArguments += ["--ui-reduced-effects"]
+    app.launch()
+    click("nav-6")
+    app.typeKey("n", modifierFlags: .command)
+    app.typeText("Typing")
+    let row = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Typing")).firstMatch
+    row.rightClick()
+    app.menuItems["重命名"].click()
+    app.typeKey("a", modifierFlags: .command)
+    app.typeText("Renamed")
+    app.typeKey(.delete, modifierFlags: [])
+    XCTAssertEqual(app.textFields["标题"].value as? String, "Rename")
+    XCTAssertTrue(
+      app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Rename")).firstMatch.exists)
+    screenshot("reduced-effects-context-menu")
+  }
+  func testGameFilterKeepsDailyTotalAndRecords() {
+    click("nav-5")
+    for name in ["Alpha", "Beta"] {
+      app.typeKey("n", modifierFlags: .command)
+      enter("游戏名称（必填）", name)
+      click("保存")
+    }
+    XCTAssertTrue(app.staticTexts["今日游戏：60 分钟"].exists)
+    app.typeKey("f", modifierFlags: .command)
+    app.typeText("Alpha")
+    XCTAssertTrue(app.staticTexts["Alpha"].exists)
+    XCTAssertFalse(app.staticTexts["Beta"].exists)
+    XCTAssertTrue(app.staticTexts["今日游戏：60 分钟"].exists)
+    enter("搜索游戏名称", "Missing")
+    XCTAssertTrue(app.staticTexts["没有匹配的游戏"].exists)
+    enter("搜索游戏名称", "")
+    XCTAssertTrue(app.staticTexts["Alpha"].exists)
+    XCTAssertTrue(app.staticTexts["Beta"].exists)
   }
   func testIconActionsKeepAccessibleNamesAndNoteDeletionUndo() {
     click("nav-6")
@@ -58,7 +204,8 @@ final class PersonalLifeUITests: XCTestCase {
     click("删除笔记")
     XCTAssertFalse(app.textFields["标题"].exists)
     click("撤销")
-    let note = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Icon-note")).firstMatch
+    let note = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Icon-note"))
+      .firstMatch
     XCTAssertTrue(note.exists)
     // This test isolates the icon actions; the row hit area has its own regression test.
     note.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.25)).click()
@@ -78,24 +225,66 @@ final class PersonalLifeUITests: XCTestCase {
     app.textViews.firstMatch.typeText("First body")
     click("新建")
     enter("标题", "Second")
-    let first = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "First、")).firstMatch
+    let first = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "First、"))
+      .firstMatch
     XCTAssertTrue(first.exists)
     // Hit the padded empty right edge, away from both title and timestamp.
     first.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).click()
     XCTAssertEqual(app.textFields["标题"].value as? String, "First")
     XCTAssertEqual(app.textViews.firstMatch.value as? String, "First body")
     enter("标题", "First edited")
-    let second = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Second、")).firstMatch
+    let second = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Second、"))
+      .firstMatch
     second.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).click()
     XCTAssertEqual(app.textFields["标题"].value as? String, "Second")
     app.terminate()
     app.launch()
     click("nav-6")
-    let restored = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "First edited")).firstMatch
+    let restored = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "First edited"))
+      .firstMatch
     restored.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).click()
     XCTAssertEqual(app.textFields["标题"].value as? String, "First edited")
     XCTAssertEqual(app.textViews.firstMatch.value as? String, "First body")
     screenshot("note-full-row-selection")
+  }
+  func testEarlierTodoVisibleAndEditableAfterRelaunch() throws {
+    click("nav-1")
+    enter("todo-input", "Yesterday pending")
+    click("添加")
+    app.terminate()
+    let file = URL(fileURLWithPath: dataDirectory).appendingPathComponent("library.json")
+    var library = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
+    var todos = try XCTUnwrap(library["todos"] as? [[String: Any]])
+    let yesterday = try XCTUnwrap(Calendar.current.date(byAdding: .day, value: -1, to: Date()))
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.dateFormat = "yyyy-MM-dd"
+    todos[0]["day"] = formatter.string(from: yesterday)
+    library["todos"] = todos
+    try JSONSerialization.data(withJSONObject: library).write(to: file, options: .atomic)
+    app.launch()
+    click("nav-1")
+    let row = app.descendants(matching: .any).matching(identifier: "earlier-open-Yesterday pending")
+      .firstMatch
+    XCTAssertTrue(row.waitForExistence(timeout: 5))
+    XCTAssertTrue(
+      row.isHittable, "Yesterday's unfinished task must be visible without expanding a group")
+    row.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5)).click()
+    XCTAssertEqual(app.textFields["名称（必填）"].value as? String, "Yesterday pending")
+    enter("名称（必填）", "Yesterday edited")
+    click("保存")
+    XCTAssertTrue(app.staticTexts["Yesterday edited"].exists)
+    click("移到今天")
+    XCTAssertTrue(
+      app.descendants(matching: .any).matching(identifier: "todo-open-Yesterday edited").firstMatch
+        .exists)
+    XCTAssertEqual((app.checkBoxes["完成"].firstMatch.value as? NSNumber)?.intValue, 0)
+    app.terminate()
+    app.launch()
+    click("nav-1")
+    XCTAssertTrue(app.staticTexts["Yesterday edited"].exists)
+    screenshot("earlier-todo-visible")
   }
   func testPendingTodoRowOpensDetailsWithoutCompleting() {
     click("nav-1")
@@ -114,7 +303,8 @@ final class PersonalLifeUITests: XCTestCase {
     app.terminate()
     app.launch()
     click("nav-1")
-    let restored = app.descendants(matching: .any).matching(identifier: "todo-open-Pending edited").firstMatch
+    let restored = app.descendants(matching: .any).matching(identifier: "todo-open-Pending edited")
+      .firstMatch
     restored.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5)).click()
     XCTAssertEqual(app.textViews.firstMatch.value as? String, "Keep this detail")
     screenshot("pending-todo-details")
@@ -178,7 +368,7 @@ final class PersonalLifeUITests: XCTestCase {
     XCTAssertTrue(f.waitForExistence(timeout: 5), app.debugDescription)
     f.click()
     f.typeKey("a", modifierFlags: .command)
-    f.typeText(value)
+    if value.isEmpty { f.typeKey(.delete, modifierFlags: []) } else { f.typeText(value) }
     f.typeKey(.tab, modifierFlags: [])
   }
   func testTrainingAppearsInTodayAndActualSetSurvivesRelaunch() {
@@ -274,6 +464,7 @@ final class PersonalLifeUITests: XCTestCase {
     XCTAssertTrue(app.staticTexts["UI-memo"].exists, app.debugDescription)
     click("nav-7")
     click("立即备份")
+    app.activate()
     XCTAssertTrue(
       app.staticTexts.matching(NSPredicate(format: "value CONTAINS %@", "备份成功")).firstMatch
         .waitForExistence(timeout: 5), app.debugDescription)
@@ -352,9 +543,16 @@ final class PersonalLifeUITests: XCTestCase {
     for i in 0...7 {
       click("nav-\(i)")
       XCTAssertLessThanOrEqual(window.frame.width, 900)
+      if i == 7 {
+        XCTAssertTrue(app.windows["设置与数据"].staticTexts["本地数据"].exists)
+        screenshot("compact-page-7")
+        app.windows["设置与数据"].buttons["_XCUI:CloseWindow"].click()
+      } else {
+        screenshot("compact-page-\(i)")
+      }
       XCTAssertTrue(app.buttons["nav-7"].isHittable)
-      screenshot("compact-page-\(i)")
     }
+    click("nav-7")
     XCTAssertTrue(app.staticTexts["本地数据"].exists)
   }
 }

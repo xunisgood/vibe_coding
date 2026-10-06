@@ -6,16 +6,10 @@ struct TrainingsView: View {
   @State private var plan: TrainingPlan?
   var body: some View {
     VStack(alignment: .leading, spacing: 18) {
-      DayPicker(model: model)
       HStack {
         Text("记录实际训练，计划不会被覆盖。").foregroundStyle(.secondary)
         Spacer()
-        IconAction("新建训练安排", systemImage: "plus") {
-          var p = TrainingPlan()
-          p.start = model.day
-          p.once = model.day
-          plan = p
-        }.buttonStyle(.borderedProminent)
+
       }
       ForEach(model.library.trainings.filter { $0.day == model.day }) { t in
         TrainingRecordView(model: model, id: t.id).id("life.training." + t.id)
@@ -62,6 +56,12 @@ struct TrainingsView: View {
         }
       }
     }.onAppear { model.ensureTrainings() }.onChange(of: model.day) { _, _ in model.ensureTrainings()
+    }
+    .onChange(of: model.newRequest) { _, _ in
+      var p = TrainingPlan()
+      p.start = model.day
+      p.once = model.day
+      plan = p
     }
     .sheet(item: $plan) { p in PlanEditor(model: model, original: p) }
   }
@@ -176,6 +176,7 @@ struct TrainingRecordView: View {
   @ObservedObject var model: AppModel
   let id: String
   @State private var single: Training?
+  @FocusState private var focusedSet: UUID?
   var training: Training? { model.library.trainings.first { $0.id == id } }
   var body: some View {
     if let t = training {
@@ -199,11 +200,18 @@ struct TrainingRecordView: View {
             if e.kind == "力量" {
               Text("计划 \(e.plannedSets) 组 × \(e.plannedReps) 次 · \(e.plannedWeight.formatted()) kg")
                 .font(.caption).foregroundStyle(.secondary)
+              HStack {
+                Text("组数").frame(width: 60)
+                Text("次数").frame(width: 75)
+                Text("重量 kg").frame(width: 75)
+                Spacer()
+              }.font(.caption).foregroundStyle(.secondary)
               ForEach(Array(e.sets.enumerated()), id: \.element.id) { index, s in
                 HStack {
                   Text("第 \(index+1) 组").frame(width: 60)
                   TextField("次数", value: setBinding(e.id, s.id, \.reps), format: .number).frame(
-                    width: 75)
+                    width: 75
+                  ).focused($focusedSet, equals: s.id)
                   TextField("重量", value: setBinding(e.id, s.id, \.weight), format: .number).frame(
                     width: 75)
                   Text("kg")
@@ -219,12 +227,14 @@ struct TrainingRecordView: View {
                 }
               }
               IconAction("记录一组", systemImage: "plus") {
+                let newSet = SetRecord()
                 mutate { t in
                   if let i = t.exercises.firstIndex(where: { $0.id == e.id }) {
-                    t.exercises[i].sets.append(SetRecord())
+                    t.exercises[i].sets.append(newSet)
                     if t.status == "未开始" { t.status = "进行中" }
                   }
                 }
+                focusedSet = newSet.id
               }
             } else {
               Text("计划 \(e.plannedMinutes) 分钟").font(.caption)

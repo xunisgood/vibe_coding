@@ -4,11 +4,42 @@ import LifeCore
 import SwiftUI
 
 @MainActor final class AppModel: ObservableObject {
+  @Published var newRequest = 0
+  @Published var searchRequest = 0
+  @Published var sidebarVisible = true {
+    didSet { if oldValue != sidebarVisible { saveWorkspace() } }
+  }
+  @Published var sidebarWidth: Double = 200 {
+    didSet { if oldValue != sidebarWidth { saveWorkspace() } }
+  }
+  var prepareToLeave: (() -> Bool)?
+  func navigate(_ destination: String) {
+    guard destination != page else { return }
+    guard prepareToLeave?() ?? true else { return }
+    page = destination
+  }
+  var openSettings: (() -> Void)?
+  var newTitle: String? {
+    [
+      "今日计划": "新建待办", "笔记": "新建", "开发工作": "新建项目",
+      "健身计划": "新建训练安排", "游戏娱乐": "记录游戏",
+    ][page]
+  }
+  var canSearch: Bool { ["笔记", "游戏娱乐"].contains(page) }
+  func requestNew() { if newTitle != nil && !locked { newRequest += 1 } }
+  func requestSearch() { if canSearch { searchRequest += 1 } }
   @Published var library = Library()
-  @Published var selectedProjectID: UUID?
+  @Published var selectedNoteID: UUID? {
+    didSet { if oldValue != selectedNoteID { saveWorkspace() } }
+  }
+  @Published var selectedProjectID: UUID? {
+    didSet { if oldValue != selectedProjectID { saveWorkspace() } }
+  }
   @Published var focusedReminderID: String?
-  @Published var page = "首页总览"
-  @Published var selectedDate = Date()
+  @Published var page = "首页总览" { didSet { if oldValue != page { saveWorkspace() } } }
+  @Published var selectedDate = Date() {
+    didSet { if oldValue != selectedDate { saveWorkspace() } }
+  }
   @Published var status = "已保存"
   @Published var error: String?
   @Published var backupStatus = "尚无备份"
@@ -16,6 +47,10 @@ import SwiftUI
   @Published var dirty = false
   @Published var undoAvailable = false
   var undoAction: ((inout Library) -> Void)?
+  @Published var workspaceWarning: String?
+  private var workspaceReady = false
+  var windowFrame: String?
+  var workspaceFile: URL { store.directory.appendingPathComponent("workspace.json") }
   private var lease: DataLease?
   let store: LibraryStore
   lazy var notifications = Notifications()
@@ -31,10 +66,46 @@ import SwiftUI
       library = try store.load()
       savedHasReminders = !library.reminders().isEmpty
       backupStatus = backups.latest(library).map { "最近备份：" + $0.formatted() } ?? "尚无有效备份"
+      restoreWorkspace()
     } catch {
       locked = true
       status = "数据读取失败"
       self.error = "原文件已保留。请在设置中恢复备份。\n" + error.localizedDescription
+    }
+  }
+  private func restoreWorkspace() {
+    defer { workspaceReady = true }
+    guard FileManager.default.fileExists(atPath: workspaceFile.path) else { return }
+    do {
+      let saved = try JSONDecoder().decode(
+        WorkspaceState.self, from: Data(contentsOf: workspaceFile)
+      ).validated(in: library)
+      page = saved.page
+      selectedNoteID = saved.noteID
+      selectedProjectID = saved.projectID
+      sidebarVisible = saved.sidebarVisible
+      sidebarWidth = saved.sidebarWidth
+      windowFrame = saved.windowFrame
+      selectedDate =
+        saved.followsToday ? Date() : saved.selectedDay.flatMap { Day.date($0) } ?? Date()
+    } catch { workspaceWarning = "界面偏好无法读取，已使用默认布局；业务记录未受影响。" }
+  }
+  func saveWorkspace() {
+    guard workspaceReady, lease != nil, !locked else { return }
+    let state = WorkspaceState(
+      page: page, noteID: selectedNoteID, projectID: selectedProjectID,
+      sidebarVisible: sidebarVisible, sidebarWidth: sidebarWidth,
+      selectedDay: day, followsToday: day == today, windowFrame: windowFrame)
+    do {
+      try store.atomicWrite(JSONEncoder().encode(state), to: workspaceFile)
+      workspaceWarning = nil
+    } catch { workspaceWarning = "界面偏好保存失败，业务记录仍按原有机制保存。" }
+  }
+  func recordWindowFrame(_ frame: NSRect) {
+    let value = NSStringFromRect(frame)
+    if windowFrame != value {
+      windowFrame = value
+      saveWorkspace()
     }
   }
   @discardableResult func change(_ action: (inout Library) throws -> Void) -> Bool {
@@ -163,6 +234,7 @@ import SwiftUI
   }
   func show(_ page: String, day: String? = nil) {
     focusedReminderID = nil
+    guard prepareToLeave?() ?? true else { return }
     self.page = page
     if let day, let d = Day.date(day) { selectedDate = d }
   }
