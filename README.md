@@ -105,6 +105,7 @@ bash scripts/test-reboot.sh verify
 
 ## 文档
 
+- [macOS 原生体验优化方案（待确认）](docs/MACOS_EXPERIENCE_OPTIMIZATION_PLAN.md)
 - [版本说明：视觉与交互修订（2026-10-04）](docs/VERSION_NOTES_2026-10-04.md)
 - [视觉重构与兼容说明](docs/VISUAL_REDESIGN.md)
 - [PRD](PRD.md)
